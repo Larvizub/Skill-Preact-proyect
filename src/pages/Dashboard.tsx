@@ -663,7 +663,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             {/* Filtros de Estatus */}
-            <div className="mb-4 space-y-2">
+            <div className={quotationsBySegment.length > 0 ? "mb-4 space-y-2" : "space-y-2"}>
               <span className="text-xs font-medium text-muted-foreground">
                 Filtrar por estatus:
               </span>
@@ -724,9 +724,11 @@ export function Dashboard() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No hay cotizaciones con los filtros seleccionados
-              </p>
+              <div className="flex items-center justify-center py-8 border-t mt-4">
+                <p className="text-sm text-muted-foreground">
+                  No hay cotizaciones con los filtros seleccionados
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
