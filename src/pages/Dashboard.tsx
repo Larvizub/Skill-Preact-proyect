@@ -661,7 +661,11 @@ export function Dashboard() {
             </div>
             <DollarSign className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent
+            className={
+              quotationsBySegment.length === 0 ? "pb-4" : undefined
+            }
+          >
             {/* Filtros de Estatus */}
             <div className="space-y-2">
               <span className="text-xs font-medium text-muted-foreground">
@@ -726,7 +730,7 @@ export function Dashboard() {
             )}
 
             {quotationsBySegment.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4 mt-2">
+              <p className="mt-3 text-sm text-muted-foreground text-center">
                 No hay cotizaciones con los filtros seleccionados
               </p>
             )}
