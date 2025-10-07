@@ -46,6 +46,7 @@ import {
   startOfDay,
 } from "date-fns";
 import { es } from "date-fns/locale";
+import { parseDateLocal } from "../lib/dateUtils";
 
 // Límite de eventos visibles por día antes de mostrar contador
 const MAX_VISIBLE_EVENTS = 3;
@@ -236,8 +237,8 @@ export function Calendario() {
 
   const getEventsSpanningDate = (date: Date) => {
     return filteredEvents.filter((event) => {
-      const eventStart = startOfDay(new Date(event.startDate));
-      const eventEnd = startOfDay(new Date(event.endDate));
+      const eventStart = startOfDay(parseDateLocal(event.startDate) || new Date());
+      const eventEnd = startOfDay(parseDateLocal(event.endDate) || new Date());
       const currentDay = startOfDay(date);
 
       return isWithinInterval(currentDay, { start: eventStart, end: eventEnd });
@@ -245,8 +246,8 @@ export function Calendario() {
   };
 
   const calculateEventPosition = (event: Event, date: Date) => {
-    const eventStart = startOfDay(new Date(event.startDate));
-    const eventEnd = startOfDay(new Date(event.endDate));
+    const eventStart = startOfDay(parseDateLocal(event.startDate) || new Date());
+    const eventEnd = startOfDay(parseDateLocal(event.endDate) || new Date());
     const currentDay = startOfDay(date);
     const monthStart = startOfDay(startOfMonth(currentDate));
     const monthEnd = startOfDay(endOfMonth(currentDate));
@@ -556,10 +557,10 @@ export function Calendario() {
                                           handleEventClick(event);
                                         }}
                                         title={`${event.title} (${format(
-                                          new Date(event.startDate),
+                                          parseDateLocal(event.startDate) || new Date(),
                                           "d MMM"
                                         )} - ${format(
-                                          new Date(event.endDate),
+                                          parseDateLocal(event.endDate) || new Date(),
                                           "d MMM"
                                         )})`}
                                         onMouseEnter={(e) => {
@@ -653,7 +654,7 @@ export function Calendario() {
                             <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                               <span>
                                 {format(
-                                  new Date(event.startDate),
+                                  parseDateLocal(event.startDate) || new Date(),
                                   "d 'de' MMMM",
                                   {
                                     locale: es,
@@ -661,7 +662,7 @@ export function Calendario() {
                                 )}{" "}
                                 -{" "}
                                 {format(
-                                  new Date(event.endDate),
+                                  parseDateLocal(event.endDate) || new Date(),
                                   "d 'de' MMMM",
                                   {
                                     locale: es,
