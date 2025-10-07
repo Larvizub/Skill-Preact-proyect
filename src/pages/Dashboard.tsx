@@ -662,9 +662,9 @@ export function Dashboard() {
             <DollarSign className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent
-            className={
-              quotationsBySegment.length === 0 ? "pb-4" : undefined
-            }
+            className={`flex flex-col gap-4${
+              quotationsBySegment.length === 0 ? " pb-6" : ""
+            }`}
           >
             {/* Filtros de Estatus */}
             <div className="space-y-2">
@@ -693,7 +693,7 @@ export function Dashboard() {
             </div>
 
             {quotationsBySegment.length > 0 && (
-              <div className="space-y-3 mt-4">
+              <div className="space-y-3">
                 {quotationsBySegment.map((segment, index) => (
                   <div key={segment.name} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
@@ -730,9 +730,9 @@ export function Dashboard() {
             )}
 
             {quotationsBySegment.length === 0 && (
-              <p className="mt-3 text-sm text-muted-foreground text-center">
+              <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-muted/40 bg-muted/20 px-4 py-6 text-sm text-muted-foreground text-center">
                 No hay cotizaciones con los filtros seleccionados
-              </p>
+              </div>
             )}
           </CardContent>
         </Card>
