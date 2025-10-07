@@ -5,15 +5,19 @@ Este archivo contiene una descripción preparada para el repositorio, instruccio
 ---
 
 ## Sugerencia: nombre del repositorio
+
 - Nombre recomendado: `skill-preact-platform` (o `Skill-Preact-proyect` si prefieres mantener el actual).
 
 ## Descripción corta (texto para el campo "Description" en GitHub)
+
 Plataforma de gestión de eventos construida con Preact + TypeScript + Vite, interfaz basada en Shadcn UI + TailwindCSS. Integra con el API de Skill para gestión de salones, servicios, cotizaciones y calendario.
 
 ## Descripción larga (README summary)
+
 Skill Preact Platform
 
 Proyecto frontend para administrar eventos, cotizaciones, salones y coordinadores. Incluye:
+
 - Preact + TypeScript + Vite
 - Estilos con TailwindCSS y componentes Shadcn UI
 - Módulos: Autenticación, Dashboard, Calendario, Salones, Inventario, Clientes, Contactos, Coordinadores
@@ -22,14 +26,17 @@ Proyecto frontend para administrar eventos, cotizaciones, salones y coordinadore
 Nota: no subir credenciales (tokens, passwords, companyAuthId) al repositorio público. Utiliza variables de entorno y `.env` locales.
 
 ## Topics (etiquetas sugeridas)
-`preact`, `typescript`, `vite`, `tailwindcss`, `shadcn-ui`, `events`, `calendar`, `dashboard`, `pnpm`, `firebase` 
+
+`preact`, `typescript`, `vite`, `tailwindcss`, `shadcn-ui`, `events`, `calendar`, `dashboard`, `pnpm`, `firebase`
 
 ## Licencia sugerida
+
 - MIT (o la que prefieras). Añade un archivo `LICENSE` si eliges MIT.
 
 ---
 
 ## Pasos para crear el repo y subir (PowerShell)
+
 A continuación hay dos opciones: (A) usando GitHub CLI (`gh`) — la forma más sencilla si ya estás autenticado; (B) manual — crear el repo por la web y luego empujar.
 
 Opción A — con `gh` (recomendado si tienes gh instalado y autenticado):
@@ -79,6 +86,7 @@ Si Git te pide credenciales y no quieres usar `gh`, genera un Personal Access To
 ---
 
 ## .gitignore recomendado (si no existe)
+
 Si tu proyecto no tiene `.gitignore`, crea uno con al menos:
 
 ```
@@ -101,12 +109,15 @@ pnpm-lock.yaml
 ---
 
 ## Opciones adicionales a configurar en GitHub
+
 - Activar Issues, Projects y Wiki si quieres usar gestión interna.
 - Configurar GitHub Pages o Actions si quieres despliegue automático.
-- AÑADIR secretos (Settings > Secrets) para CI: FIREBASE_TOKEN, VITE_* variables, etc.
+- AÑADIR secretos (Settings > Secrets) para CI: FIREBASE*TOKEN, VITE*\* variables, etc.
 
 ## Pipeline recomendado (despliegue a Firebase Hosting)
+
 Si quieres desplegar automáticamente al hacer push en `main`, puedo darte un `workflow` de GitHub Actions que:
+
 - Instala node/pnpm
 - Instala dependencias
 - Build
@@ -117,15 +128,18 @@ Dime si quieres que cree ese workflow y lo suba al repo (necesitarás añadir `F
 ---
 
 ## ¿Quieres que lo haga por ti?
+
 Puedo ejecutar los comandos y subir el repo desde esta máquina si:
+
 - me confirmas el nombre del repo que quieres y
-- estás autenticado en `gh` en esta máquina **o** me proporcionas acceso temporal (no recomendado). 
+- estás autenticado en `gh` en esta máquina **o** me proporcionas acceso temporal (no recomendado).
 
 Si prefieres que solo genere los archivos (README mejorado, LICENSE, GitHub Actions workflow) también lo hago y te dejo los comandos para que lo publiques.
 
 ---
 
 Listado de archivos útiles añadidos por este asistente (si decides aceptar cambios automáticos):
+
 - `.github/REPO_SETUP.md` (este archivo)
 
 ---
