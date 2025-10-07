@@ -72,28 +72,6 @@ export function Dashboard() {
     }));
   };
 
-  // Filtros de cotizaciones - por defecto solo confirmado y por confirmar
-  const [quotationStatusFilters, setQuotationStatusFilters] = useState<
-    Record<StatusCategory, boolean>
-  >({
-    confirmado: true,
-    porConfirmar: true,
-    opcion1: false,
-    opcion2: false,
-    opcion3: false,
-    reunionInterna: false,
-    eventoInterno: false,
-    cancelado: false,
-    otros: false,
-  });
-
-  const toggleQuotationStatusFilter = (status: StatusCategory) => {
-    setQuotationStatusFilters((prev) => ({
-      ...prev,
-      [status]: !prev[status],
-    }));
-  };
-
   useEffect(() => {
     loadData();
   }, []);
@@ -300,10 +278,10 @@ export function Dashboard() {
     eventsInMonth.forEach((event) => {
       const rawEvent = event as any;
 
-      // Filtrar por estatus seleccionado
+      // Filtrar por estatus según los filtros globales
       const statusCategory = classifyEventStatus(event);
-      if (!quotationStatusFilters[statusCategory]) {
-        return; // Saltar eventos cuyo estatus no está seleccionado
+      if (!statsStatusFilters[statusCategory]) {
+        return; // Saltar eventos cuyo estatus no está activo en las estadísticas
       }
 
       // Obtener el segmento de mercado
@@ -350,7 +328,7 @@ export function Dashboard() {
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [eventsInMonth, quotationStatusFilters]);
+  }, [eventsInMonth, statsStatusFilters]);
 
   const maxTrendValue = Math.max(...monthlyTrend.map((m) => m.count), 1);
   const maxStatusValue = Math.max(...Object.values(statusDistribution), 1);
@@ -661,36 +639,13 @@ export function Dashboard() {
             </div>
             <DollarSign className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
-          <CardContent
-            className={`flex flex-col gap-4${
-              quotationsBySegment.length === 0 ? " pb-6" : ""
-            }`}
-          >
-            {/* Filtros de Estatus */}
-            <div className="space-y-2">
-              <span className="text-xs font-medium text-muted-foreground">
-                Filtrar por estatus:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {STATUS_DEFINITIONS.map((definition) => (
-                  <FilterPill
-                    key={definition.id}
-                    checked={quotationStatusFilters[definition.id]}
-                    onChange={() =>
-                      toggleQuotationStatusFilter(definition.id) as any
-                    }
-                    label={definition.label}
-                  >
-                    <span className="relative flex h-3.5 w-3.5 items-center justify-center">
-                      <span
-                        className={`absolute inset-0 rounded-sm ${definition.colorClass} opacity-60 transition-opacity peer-checked:opacity-100`}
-                      />
-                      <Check className="relative h-2.5 w-2.5 text-white opacity-0 transition-opacity peer-checked:opacity-100" />
-                    </span>
-                  </FilterPill>
-                ))}
-              </div>
-            </div>
+          <CardContent className={`flex flex-col gap-4${
+            quotationsBySegment.length === 0 ? " pb-6" : ""
+          }`}>
+            <p className="text-xs text-muted-foreground">
+              Los montos reflejan únicamente los estatus activos en la sección
+              “Filtrar Estadísticas por Estatus”.
+            </p>
 
             {quotationsBySegment.length > 0 && (
               <div className="space-y-3">
