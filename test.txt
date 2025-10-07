@@ -1,0 +1,86 @@
+import { useEffect, useState } from "preact/hooks";
+import { Layout } from "../components/layout/Layout";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Spinner } from "../components/ui/spinner";
+import { apiService } from "../services/api.service";
+import type { Event, EventStatus } from "../services/api.service";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+} from "lucide-preact";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameDay,
+  addMonths,
+  subMonths,
+  isWithinInterval,
+  differenceInDays,
+  isBefore,
+  isAfter,
+  startOfDay,
+} from "date-fns";
+import { es } from "date-fns/locale";
+
+// Límite de eventos visibles por día antes de mostrar contador
+const MAX_VISIBLE_EVENTS = 3;
+
+export function Calendario() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [eventStatuses, setEventStatuses] = useState<EventStatus[]>([]);
+
+  // Funciones antes de useEffect
+    try {
+      const statuses = await apiService.getEventStatuses();
+      console.log("Estados de eventos cargados:", statuses);
+      setEventStatuses(statuses);
+    } catch (error) {
+      console.error("Error loading event statuses:", error);
+    }
+  };
+
+  const loadEvents = async () {
+    setLoading(true);
+    try {
+      const start = format(startOfMonth(currentDate), "yyyy-MM-dd");
+      const end = format(endOfMonth(currentDate), "yyyy-MM-dd");
+      const data = await apiService.getEvents(start, end);
+
+      // Log para debugging - ver estructura de eventos
+      if (data.length > 0) {
+        console.log("Primer evento recibido:", data[0]);
+        console.log("EventStatus del primer evento:", data[0].eventStatus);
+      }
+
+      // Enriquecer eventos con sus estados si no vienen incluidos
+      const enrichedEvents = data.map((event) => {
+        if (!event.eventStatus && event.idEvent) {
+          // Si el evento no tiene estado pero tiene un idEventStatus, buscarlo
+          const status = eventStatuses.find(
+            (s) => s.id === (event as any).idEventStatus
+          );
+          if (status) {
+            return { ...event, eventStatus: status };
+          }
+        }
+        return event;
+      });
+
+      console.log("Eventos enriquecidos:", enrichedEvents.slice(0, 3));
+      setEvents(enrichedEvents);
+    } catch (error) {
+      console.error("Error loading events:", error);
+    } finally {
+      setLoading(false);
