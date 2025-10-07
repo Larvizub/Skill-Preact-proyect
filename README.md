@@ -17,15 +17,24 @@ Plataforma web desarrollada con **Vite + Preact + TypeScript** para la gestión 
 
 ### Módulos Implementados
 
-1. **Autenticación** - Sistema de login con API de Skill
-2. **Dashboard** - Vista general con estadísticas
-3. **Eventos** - Consulta de eventos con cotizaciones y detalles
-4. **Calendario** - Vista mensual de eventos
-5. **Salones** - Gestión de salones y tarifas
-6. **Inventario** - Artículos y servicios disponibles
-7. **Coordinadores** - Equipo de coordinación de cuentas
-8. **Clientes** - (En desarrollo)
-9. **Contactos** - (En desarrollo)
+La lista a continuación refleja los módulos actuales en `src/pages` del proyecto y una breve descripción de cada uno.
+
+1. **Login** (`Login.tsx`) - Página de autenticación y flujo de inicio de sesión.
+2. **Dashboard** (`Dashboard.tsx`) - Vista general con KPIs, tendencias y tarjetas de resumen.
+3. **Eventos** (`Eventos.tsx`) - Búsqueda y listado de eventos con filtros y accesos a detalle.
+4. **Evento Detalle** (`EventoDetalle.tsx`) - Vista detallada de un evento con actividades, servicios y facturas.
+5. **Calendario** (`Calendario.tsx`) - Vista mensual tipo calendario con conteo y filtros por estatus/segmento.
+6. **Salones** (`Salones.tsx`) - Gestión y visualización de salones y sus características.
+7. **Salones Disponibles** (`SalonesDisponibles.tsx`) - Búsqueda de disponibilidad de salones por rango de fechas.
+8. **Personal Eventos** (`PersonalEventos.tsx`) - Módulo para revisar asignaciones y costos de personal por actividad.
+9. **Parqueos Eventos** (`ParqueosEventos.tsx`) - Desglose por actividades de parqueos y servicios relacionados.
+10. **Inventario** (`Inventario.tsx`) - Catálogo de artículos y servicios disponibles para cotización.
+11. **Coordinadores** (`Coordinadores.tsx`) - Lista y gestión de coordinadores de cuenta / agentes de ventas.
+12. **Clientes** (`Clientes.tsx`) - Gestión básica de clientes y contactos asociados.
+13. **Contactos** (`Contactos.tsx`) - Gestión de contactos relacionados con clientes y eventos.
+14. **ApiTest** (`ApiTest.tsx`) - Página para pruebas rápidas y debug de llamadas al API.
+
+Si falta algún módulo (por ejemplo importaciones nuevas en `src/pages`), házmelo saber y lo añado aquí.
 
 ### Características UI/UX
 
