@@ -636,7 +636,7 @@ export function Dashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{stats.rooms}</div>
               <p className="text-xs text-muted-foreground">
-                Disponibles en el sistema
+                Salones totales en el recinto
               </p>
             </CardContent>
           </Card>
