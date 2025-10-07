@@ -38,6 +38,7 @@ import {
   type SegmentOption,
   type StatusCategory,
 } from "../lib/eventStatus";
+import { parseDateLocal } from "../lib/dateUtils";
 
 export function Eventos() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -59,13 +60,13 @@ export function Eventos() {
   const [eventName, setEventName] = useState("");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
-    return now.toISOString().split("T")[0];
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return startOfMonth.toISOString().split("T")[0];
   });
   const [endDate, setEndDate] = useState(() => {
     const now = new Date();
-    const oneMonthLater = new Date(now);
-    oneMonthLater.setMonth(now.getMonth() + 1);
-    return oneMonthLater.toISOString().split("T")[0];
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return endOfMonth.toISOString().split("T")[0];
   });
 
   const loadEvents = async () => {
@@ -130,16 +131,19 @@ export function Eventos() {
       let filtered = data;
 
       if (filterType === "dateRange" && startDate && endDate) {
-        const startBoundary = new Date(`${startDate}T00:00:00`);
-        const endBoundary = new Date(`${endDate}T23:59:59`);
+        const startBoundary =
+          parseDateLocal(startDate) ?? new Date(`${startDate}T00:00:00`);
+        const endBoundary =
+          parseDateLocal(endDate) ?? new Date(`${endDate}T00:00:00`);
+        endBoundary.setHours(23, 59, 59, 999);
 
         filtered = data.filter((eventItem: Event) => {
-          const eventStart = eventItem.startDate
-            ? new Date(eventItem.startDate)
-            : undefined;
-          const eventEnd = eventItem.endDate
-            ? new Date(eventItem.endDate)
-            : eventStart;
+          const eventStart =
+            parseDateLocal(eventItem.startDate) ??
+            (eventItem.startDate ? new Date(eventItem.startDate) : undefined);
+          const eventEnd =
+            parseDateLocal(eventItem.endDate) ??
+            (eventItem.endDate ? new Date(eventItem.endDate) : eventStart);
 
           if (!eventStart && !eventEnd) {
             return false;
@@ -180,10 +184,10 @@ export function Eventos() {
     setEventNumber("");
     setEventName("");
     const now = new Date();
-    setStartDate(now.toISOString().split("T")[0]);
-    const oneMonthLater = new Date(now);
-    oneMonthLater.setMonth(now.getMonth() + 1);
-    setEndDate(oneMonthLater.toISOString().split("T")[0]);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    setStartDate(monthStart.toISOString().split("T")[0]);
+    setEndDate(monthEnd.toISOString().split("T")[0]);
     setEvents([]);
     setStatusFilters({ ...DEFAULT_STATUS_FILTERS });
     setSegmentFilters({});
@@ -629,15 +633,17 @@ export function Eventos() {
                               <TableCell>
                                 <div className="flex items-center gap-2 text-sm">
                                   <Calendar className="h-3 w-3 text-muted-foreground" />
-                                  {new Date(event.startDate).toLocaleDateString(
-                                    "es-ES"
-                                  )}
+                                  {(
+                                    parseDateLocal(event.startDate) ??
+                                    new Date(event.startDate)
+                                  ).toLocaleDateString("es-ES")}
                                 </div>
                               </TableCell>
                               <TableCell>
-                                {new Date(event.endDate).toLocaleDateString(
-                                  "es-ES"
-                                )}
+                                {(
+                                  parseDateLocal(event.endDate) ??
+                                  new Date(event.endDate)
+                                ).toLocaleDateString("es-ES")}
                               </TableCell>
                               <TableCell>
                                 <span className="flex items-center gap-2 text-sm text-muted-foreground">

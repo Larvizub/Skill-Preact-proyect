@@ -364,8 +364,7 @@ export const getEventMarketSegmentKey = (event: Event) => {
     return SEGMENT_FALLBACK_KEY;
   }
 
-  const normalized = normalizeKey(segment);
-  return normalized || SEGMENT_FALLBACK_KEY;
+  return getMarketSegmentKeyFromLabel(segment);
 };
 
 export const collectMarketSegments = (events: Event[]) => {
@@ -405,7 +404,21 @@ export type SegmentOption = { key: string; label: string };
 
 export const getMarketSegmentKeyFromLabel = (label: string) => {
   const normalized = normalizeKey(label || "");
-  return normalized || SEGMENT_FALLBACK_KEY;
+
+  if (!normalized) {
+    return SEGMENT_FALLBACK_KEY;
+  }
+
+  const compact = normalized.replace(/-/g, "");
+
+  if (
+    (compact.includes("reserva") && compact.includes("interna")) ||
+    (compact.includes("reunion") && compact.includes("interna"))
+  ) {
+    return "reunion-interna";
+  }
+
+  return normalized;
 };
 
 export const buildSegmentOption = (label: string): SegmentOption => ({
