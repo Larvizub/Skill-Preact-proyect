@@ -12,6 +12,7 @@ import { Spinner } from "../components/ui/spinner";
 import { apiService } from "../services/api.service";
 import type { Event } from "../services/api.service";
 import { getEventStatusText } from "../lib/eventStatus";
+import { formatDateLocal } from "../lib/dateUtils";
 import {
   Calendar,
   DollarSign,
@@ -207,11 +208,11 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Hash className="h-4 w-4" />
-                ID: {event.idEvent}
+                Número: {event.idEvent}
               </span>
               <span className="flex items-center gap-1">
                 <FileText className="h-4 w-4" />
-                Número: {(event as any)?.eventNumber}
+                ID: {(event as any)?.eventNumber}
               </span>
               <div className="text-sm">
                 <span className="font-medium text-foreground">
@@ -279,7 +280,7 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                   </p>
                   <div className="flex items-center gap-2 text-sm mt-1">
                     <Calendar className="h-4 w-4" />
-                    {new Date(event.startDate).toLocaleDateString("es-ES", {
+                    {formatDateLocal(event.startDate, "es-ES", {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
@@ -293,7 +294,7 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                   </p>
                   <div className="flex items-center gap-2 text-sm mt-1">
                     <Calendar className="h-4 w-4" />
-                    {new Date(event.endDate).toLocaleDateString("es-ES", {
+                    {formatDateLocal(event.endDate, "es-ES", {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
@@ -655,11 +656,7 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                             </div>
                             <div className="text-right text-xs text-muted-foreground">
                               {activity.activityDate && (
-                                <p>
-                                  {new Date(
-                                    activity.activityDate
-                                  ).toLocaleDateString("es-ES")}
-                                </p>
+                                <p>{formatDateLocal(activity.activityDate)}</p>
                               )}
                               {activity.startTime && activity.endTime && (
                                 <p>
@@ -716,13 +713,15 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                               activity.scheduleDescription ||
                               room.schedule?.scheduleDescription ||
                               (activity.activityDate
-                                ? new Date(
-                                    activity.activityDate
-                                  ).toLocaleDateString("es-ES", {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  })
+                                ? formatDateLocal(
+                                    activity.activityDate,
+                                    "es-ES",
+                                    {
+                                      year: "numeric",
+                                      month: "long",
+                                      day: "numeric",
+                                    }
+                                  )
                                 : "Sin horario especificado");
 
                             if (!roomsBySchedule[scheduleKey])
@@ -773,13 +772,15 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                                       {item.activity?.activityDate && (
                                         <p className="text-xs text-muted-foreground mt-1">
                                           📅 Fecha Actividad:{" "}
-                                          {new Date(
-                                            item.activity.activityDate
-                                          ).toLocaleDateString("es-ES", {
-                                            year: "numeric",
-                                            month: "long",
-                                            day: "numeric",
-                                          })}
+                                          {formatDateLocal(
+                                            item.activity.activityDate,
+                                            "es-ES",
+                                            {
+                                              year: "numeric",
+                                              month: "long",
+                                              day: "numeric",
+                                            }
+                                          )}
                                         </p>
                                       )}
 
@@ -935,13 +936,15 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                                       {item.activity?.activityDate && (
                                         <p className="text-xs text-muted-foreground mt-1">
                                           📅 Fecha Actividad:{" "}
-                                          {new Date(
-                                            item.activity.activityDate
-                                          ).toLocaleDateString("es-ES", {
-                                            year: "numeric",
-                                            month: "long",
-                                            day: "numeric",
-                                          })}
+                                          {formatDateLocal(
+                                            item.activity.activityDate,
+                                            "es-ES",
+                                            {
+                                              year: "numeric",
+                                              month: "long",
+                                              day: "numeric",
+                                            }
+                                          )}
                                         </p>
                                       )}
 
@@ -961,9 +964,9 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                                       {item.schedule?.startDate && (
                                         <p className="text-xs text-muted-foreground mt-1">
                                           📅{" "}
-                                          {new Date(
+                                          {formatDateLocal(
                                             item.schedule.startDate
-                                          ).toLocaleDateString("es-ES")}
+                                          )}
                                           {item.schedule.startTime &&
                                             item.schedule.endTime && (
                                               <span>
@@ -999,13 +1002,15 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                                       {item.creationDate && (
                                         <p>
                                           Creado:{" "}
-                                          {new Date(
-                                            item.creationDate
-                                          ).toLocaleDateString("es-ES", {
-                                            day: "2-digit",
-                                            month: "2-digit",
-                                            year: "numeric",
-                                          })}
+                                          {formatDateLocal(
+                                            item.creationDate,
+                                            "es-ES",
+                                            {
+                                              day: "2-digit",
+                                              month: "2-digit",
+                                              year: "numeric",
+                                            }
+                                          )}
                                         </p>
                                       )}
                                     </div>

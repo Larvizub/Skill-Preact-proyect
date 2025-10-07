@@ -639,9 +639,11 @@ export function Dashboard() {
             </div>
             <DollarSign className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
-          <CardContent className={`flex flex-col gap-4${
-            quotationsBySegment.length === 0 ? " pb-6" : ""
-          }`}>
+          <CardContent
+            className={`flex flex-col gap-4${
+              quotationsBySegment.length === 0 ? " pb-6" : ""
+            }`}
+          >
             <p className="text-xs text-muted-foreground">
               Los montos reflejan únicamente los estatus activos en la sección
               “Filtrar Estadísticas por Estatus”.

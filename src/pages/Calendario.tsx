@@ -237,7 +237,9 @@ export function Calendario() {
 
   const getEventsSpanningDate = (date: Date) => {
     return filteredEvents.filter((event) => {
-      const eventStart = startOfDay(parseDateLocal(event.startDate) || new Date());
+      const eventStart = startOfDay(
+        parseDateLocal(event.startDate) || new Date()
+      );
       const eventEnd = startOfDay(parseDateLocal(event.endDate) || new Date());
       const currentDay = startOfDay(date);
 
@@ -246,7 +248,9 @@ export function Calendario() {
   };
 
   const calculateEventPosition = (event: Event, date: Date) => {
-    const eventStart = startOfDay(parseDateLocal(event.startDate) || new Date());
+    const eventStart = startOfDay(
+      parseDateLocal(event.startDate) || new Date()
+    );
     const eventEnd = startOfDay(parseDateLocal(event.endDate) || new Date());
     const currentDay = startOfDay(date);
     const monthStart = startOfDay(startOfMonth(currentDate));
@@ -557,10 +561,12 @@ export function Calendario() {
                                           handleEventClick(event);
                                         }}
                                         title={`${event.title} (${format(
-                                          parseDateLocal(event.startDate) || new Date(),
+                                          parseDateLocal(event.startDate) ||
+                                            new Date(),
                                           "d MMM"
                                         )} - ${format(
-                                          parseDateLocal(event.endDate) || new Date(),
+                                          parseDateLocal(event.endDate) ||
+                                            new Date(),
                                           "d MMM"
                                         )})`}
                                         onMouseEnter={(e) => {
