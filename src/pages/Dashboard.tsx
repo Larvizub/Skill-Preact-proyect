@@ -724,11 +724,9 @@ export function Dashboard() {
                 ))}
               </div>
             ) : (
-              <div className="flex items-center justify-center py-8 border-t mt-4">
-                <p className="text-sm text-muted-foreground">
-                  No hay cotizaciones con los filtros seleccionados
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground text-center py-4 mt-2">
+                No hay cotizaciones con los filtros seleccionados
+              </p>
             )}
           </CardContent>
         </Card>
