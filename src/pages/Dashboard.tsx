@@ -663,7 +663,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             {/* Filtros de Estatus */}
-            <div className={quotationsBySegment.length > 0 ? "mb-4 space-y-2" : "space-y-2"}>
+            <div className="space-y-2">
               <span className="text-xs font-medium text-muted-foreground">
                 Filtrar por estatus:
               </span>
@@ -688,8 +688,8 @@ export function Dashboard() {
               </div>
             </div>
 
-            {quotationsBySegment.length > 0 ? (
-              <div className="space-y-3">
+            {quotationsBySegment.length > 0 && (
+              <div className="space-y-3 mt-4">
                 {quotationsBySegment.map((segment, index) => (
                   <div key={segment.name} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
@@ -723,7 +723,9 @@ export function Dashboard() {
                   </div>
                 ))}
               </div>
-            ) : (
+            )}
+
+            {quotationsBySegment.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4 mt-2">
                 No hay cotizaciones con los filtros seleccionados
               </p>
