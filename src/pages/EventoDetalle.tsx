@@ -32,10 +32,12 @@ import {
 } from "lucide-preact";
 
 interface EventoDetalleProps {
+  eventNumber?: string;
   id?: string;
 }
 
-export function EventoDetalle({ id }: EventoDetalleProps) {
+export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
+  const eventIdentifier = eventNumber ?? id ?? null;
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [cotizacionExpanded, setCotizacionExpanded] = useState(false);
@@ -43,19 +45,19 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
 
   useEffect(() => {
     console.log("=== EventoDetalle useEffect ===");
-    console.log("ID recibido:", id);
-    console.log("Tipo de ID:", typeof id);
+    console.log("ID recibido:", eventIdentifier);
+    console.log("Tipo de ID:", typeof eventIdentifier);
 
     // Cargar servicios del catálogo primero
     loadCatalogServices();
 
-    if (id) {
-      loadEventDetails(id);
+    if (eventIdentifier) {
+      loadEventDetails(eventIdentifier);
     } else {
       console.error("No se recibió ID");
       setLoading(false);
     }
-  }, [id]);
+  }, [eventIdentifier]);
 
   const loadCatalogServices = async () => {
     try {
@@ -66,7 +68,7 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
     }
   };
 
-  const loadEventDetails = async (eventId: string) => {
+  const loadEventDetails = async (eventIdentifier: string) => {
     try {
       setLoading(true);
 
@@ -76,7 +78,10 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
         try {
           const parsedEvent = JSON.parse(storedEvent);
           console.log("Evento cargado desde sessionStorage:", parsedEvent);
-          if (parsedEvent.idEvent.toString() === eventId) {
+          const storedMatches =
+            parsedEvent?.eventNumber?.toString() === eventIdentifier ||
+            parsedEvent?.idEvent?.toString() === eventIdentifier;
+          if (storedMatches) {
             setEvent(parsedEvent);
             setLoading(false);
             return;
@@ -108,19 +113,27 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
       }
 
       console.log(
-        "Buscando evento ID:",
-        eventId,
+        "Buscando evento por identificador:",
+        eventIdentifier,
         "en rango:",
         startDate,
         "a",
         endDate
       );
-      const events = await apiService.getEvents(startDate, endDate);
+      const events = await apiService.getEvents(
+        startDate,
+        endDate,
+        eventIdentifier
+      );
       console.log("Total eventos encontrados:", events.length);
 
-      const foundEvent = events.find(
-        (eventItem: Event) => eventItem.idEvent.toString() === eventId
-      );
+      const foundEvent = events.find((eventItem: Event) => {
+        const eventNum = (eventItem as any)?.eventNumber;
+        return (
+          eventNum?.toString() === eventIdentifier ||
+          eventItem.idEvent?.toString() === eventIdentifier
+        );
+      });
       console.log("Evento encontrado:", foundEvent);
 
       if (foundEvent) {
@@ -128,7 +141,10 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
         // Guardar en sessionStorage para futuras recargas
         sessionStorage.setItem("currentEvent", JSON.stringify(foundEvent));
       } else {
-        console.error("Evento no encontrado con ID:", eventId);
+        console.error(
+          "Evento no encontrado con identificador:",
+          eventIdentifier
+        );
       }
     } catch (error) {
       console.error("Error cargando detalles del evento:", error);
@@ -208,11 +224,11 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Hash className="h-4 w-4" />
-                Número: {event.idEvent}
+                ID Evento (Skill): {(event as any)?.eventNumber ?? "-"}
               </span>
               <span className="flex items-center gap-1">
                 <FileText className="h-4 w-4" />
-                ID: {(event as any)?.eventNumber}
+                ID Interno: {event.idEvent}
               </span>
               <div className="text-sm">
                 <span className="font-medium text-foreground">
@@ -1221,11 +1237,124 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                     }
                   });
 
+                const amountSources = [
+                  rawEvent,
+                  rawEvent?.totals,
+                  rawEvent?.Totals,
+                  rawEvent?.eventTotals,
+                  rawEvent?.financialSummary,
+                  rawEvent?.financial,
+                  rawEvent?.quoteTotals,
+                  rawEvent?.quote,
+                  rawEvent?.summary,
+                  rawEvent?.pricing,
+                  rawEvent?.eventSummary,
+                ];
+
+                const parseNumericValue = (value: unknown): number | null => {
+                  if (value === null || value === undefined) return null;
+                  if (typeof value === "number") {
+                    return Number.isFinite(value) ? value : null;
+                  }
+                  if (typeof value === "string") {
+                    const normalized = Number(value.replace(/[^0-9.-]+/g, ""));
+                    return Number.isNaN(normalized) ? null : normalized;
+                  }
+                  return null;
+                };
+
+                const pickAmount = (keys: string[]): number | null => {
+                  for (const source of amountSources) {
+                    if (!source || typeof source !== "object") continue;
+                    for (const key of keys) {
+                      if (!(key in source)) continue;
+                      const candidate = parseNumericValue(
+                        (source as Record<string, unknown>)[key]
+                      );
+                      if (candidate !== null) {
+                        return candidate;
+                      }
+                    }
+                  }
+                  return null;
+                };
+
+                const ensurePositive = (value: number | null): number => {
+                  if (value === null || Number.isNaN(value)) return 0;
+                  return Math.abs(value);
+                };
+
+                const subtotal = totalGeneral;
+                const discountAmount = ensurePositive(
+                  pickAmount([
+                    "totalDiscount",
+                    "totalDiscountAmount",
+                    "discountAmount",
+                    "eventDiscount",
+                    "discount",
+                    "discountValue",
+                    "eventDiscountAmount",
+                  ])
+                );
+                const taxesAmount = ensurePositive(
+                  pickAmount([
+                    "totalTax",
+                    "totalTaxes",
+                    "totalTaxAmount",
+                    "taxAmount",
+                    "eventTax",
+                    "taxes",
+                    "taxValue",
+                    "eventTaxes",
+                  ])
+                );
+                const providedGrandTotalValue = pickAmount([
+                  "totalAmount",
+                  "grandTotal",
+                  "eventTotal",
+                  "totalWithTax",
+                  "eventAmount",
+                  "totalQuotation",
+                ]);
+
+                const computedGrandTotal =
+                  subtotal - discountAmount + taxesAmount;
+
+                const normalizedFinalTotal = (() => {
+                  if (
+                    providedGrandTotalValue !== null &&
+                    Number.isFinite(providedGrandTotalValue)
+                  ) {
+                    return providedGrandTotalValue;
+                  }
+                  if (Number.isFinite(computedGrandTotal)) {
+                    return computedGrandTotal;
+                  }
+                  return subtotal;
+                })();
+
+                const usesProvidedTotal =
+                  providedGrandTotalValue !== null &&
+                  Number.isFinite(providedGrandTotalValue);
+
+                const formatCurrency = (value: number) =>
+                  value.toLocaleString("es-ES", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  });
+
+                const subtotalDisplay = `$${formatCurrency(subtotal)}`;
+                const discountDisplay = `$${formatCurrency(discountAmount)}`;
+                const taxesDisplay = `$${formatCurrency(taxesAmount)}`;
+                const finalTotalDisplay = `$${formatCurrency(
+                  normalizedFinalTotal
+                )}`;
+
                 // 3. Mostrar la cotización con acordeón
                 return totalesPorArea.length > 0 ? (
                   <div className="space-y-4">
                     {/* Resumen Total (siempre visible) */}
-                    <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg">
+                    <div className="flex flex-col gap-4 rounded-lg bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-lg font-bold">Total Cotizado</p>
                         <p className="text-xs text-muted-foreground">
@@ -1237,19 +1366,43 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                           {totalesPorArea.length === 1 ? "área" : "áreas"}
                         </p>
                       </div>
-                      <p className="text-2xl font-bold text-primary">
-                        $
-                        {totalGeneral.toLocaleString("es-ES", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
+                      <div className="text-right">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          {usesProvidedTotal
+                            ? "Total final del sistema"
+                            : "Subtotal - descuento + impuestos"}
+                        </p>
+                        <p className="text-2xl font-bold text-primary">
+                          {finalTotalDisplay}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 rounded-lg border border-border/70 bg-background/50 p-4 text-sm shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span className="font-medium text-foreground">
+                          {subtotalDisplay}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-destructive">
+                        <span>Descuento del sistema</span>
+                        <span className="font-medium">-{discountDisplay}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+                        <span>Impuestos del sistema</span>
+                        <span className="font-medium">+{taxesDisplay}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-border/60 pt-2 font-semibold text-primary">
+                        <span>Total con ajustes</span>
+                        <span>{finalTotalDisplay}</span>
+                      </div>
                     </div>
 
                     {/* Botón de Acordeón */}
                     <button
                       onClick={() => setCotizacionExpanded(!cotizacionExpanded)}
-                      className="w-full flex items-center justify-between p-3 rounded-md border border-border hover:bg-accent transition-colors"
+                      className="flex w-full items-center justify-between rounded-md border border-border p-3 transition-colors hover:bg-accent"
                     >
                       <span className="text-sm font-medium">
                         {cotizacionExpanded ? "Ocultar" : "Ver"} Detalle por
@@ -1268,10 +1421,10 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                         {totalesPorArea.map((areaData) => (
                           <div
                             key={areaData.area}
-                            className="space-y-3 p-4 bg-muted/50 rounded-lg"
+                            className="space-y-3 rounded-lg bg-muted/50 p-4"
                           >
-                            <div className="flex items-center justify-between pb-2 border-b">
-                              <h4 className="font-semibold text-sm">
+                            <div className="flex items-center justify-between border-b pb-2">
+                              <h4 className="text-sm font-semibold">
                                 {areaData.area}
                               </h4>
                               <p className="text-sm font-bold text-primary">
@@ -1302,7 +1455,7 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                                       </p>
                                     )}
                                   </div>
-                                  <div className="text-right ml-4">
+                                  <div className="ml-4 text-right">
                                     <p className="font-medium">
                                       $
                                       {(
@@ -1320,19 +1473,20 @@ export function EventoDetalle({ id }: EventoDetalleProps) {
                         ))}
 
                         {/* Nota sobre precios */}
-                        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3">
-                          <p className="text-xs text-blue-800 dark:text-blue-200">
-                            <strong>Nota:</strong> Los montos mostrados son
-                            calculados desde los datos de salones y servicios.
-                            Se priorizan precios sin impuestos (TNI) cuando
-                            están disponibles.
+                        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+                          <p>
+                            <strong>Nota:</strong> El subtotal se calcula a
+                            partir de los salones y servicios listados. El total
+                            final incluye el descuento y los impuestos
+                            proporcionados por el sistema y se priorizan precios
+                            sin impuestos (TNI) cuando están disponibles.
                           </p>
                         </div>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-center text-muted-foreground py-8">
+                  <p className="py-8 text-center text-muted-foreground">
                     No hay información de precios disponible para este evento
                   </p>
                 );

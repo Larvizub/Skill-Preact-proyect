@@ -30,7 +30,7 @@ function App() {
         {/* @ts-ignore - preact-router path prop types */}
         <Eventos path="/eventos" />
         {/* @ts-ignore - preact-router path prop types */}
-        <EventoDetalle path="/eventos/:id" />
+        <EventoDetalle path="/eventos/:eventNumber" />
         {/* @ts-ignore - preact-router path prop types */}
         <Calendario path="/calendario" />
         {/* @ts-ignore - preact-router path prop types */}

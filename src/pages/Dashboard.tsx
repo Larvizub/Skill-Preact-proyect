@@ -1,4 +1,10 @@
-import { useEffect, useState, useMemo } from "preact/hooks";
+import {
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+} from "preact/hooks";
 import { Layout } from "../components/layout/Layout";
 import {
   Card,
@@ -30,7 +36,6 @@ import {
   endOfMonth,
   subMonths,
   addMonths,
-  isWithinInterval,
   isFuture,
   isPast,
   startOfDay,
@@ -46,9 +51,24 @@ import FilterPill from "../components/ui/FilterPill";
 import { Check } from "lucide-preact";
 
 export function Dashboard() {
-  const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsLoaded, setRoomsLoaded] = useState(false);
+  const roomsPromiseRef = useRef<Promise<void> | null>(null);
+
+  const [eventsByMonth, setEventsByMonth] = useState<Record<string, Event[]>>(
+    {}
+  );
+  const eventsCacheRef = useRef<Record<string, Event[]>>({});
+  const pendingFetchesRef = useRef<
+    Record<string, Promise<Event[]> | undefined>
+  >({});
+  const [loadingMonths, setLoadingMonths] = useState<Record<string, boolean>>(
+    {}
+  );
+
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filtros de estadísticas generales - por defecto todos activos excepto cancelado
   const [statsStatusFilters, setStatsStatusFilters] = useState<
@@ -72,36 +92,164 @@ export function Dashboard() {
     }));
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const now = new Date();
-
-      // Cargar eventos de los últimos 6 meses para análisis de tendencias
-      const sixMonthsAgo = subMonths(now, 6);
-      const startDate = format(startOfMonth(sixMonthsAgo), "yyyy-MM-dd");
-      const endDate = format(endOfMonth(now), "yyyy-MM-dd");
-
-      const [eventsData, roomsData] = await Promise.all([
-        apiService.getEvents(startDate, endDate),
-        apiService.getRooms(),
-      ]);
-
-      setAllEvents(eventsData);
-      setRooms(roomsData);
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
-    } finally {
-      setLoading(false);
+  const ensureRooms = useCallback(async () => {
+    if (roomsLoaded) {
+      return;
     }
-  };
 
-  // Mes seleccionado para mostrar las estadísticas (por defecto mes actual)
+    if (roomsPromiseRef.current) {
+      await roomsPromiseRef.current;
+      return;
+    }
+
+    const promise = apiService
+      .getRooms()
+      .then((data) => {
+        setRooms(data);
+        setRoomsLoaded(true);
+      })
+      .catch((err) => {
+        console.error("Error loading rooms:", err);
+        throw err;
+      })
+      .finally(() => {
+        roomsPromiseRef.current = null;
+      });
+
+    roomsPromiseRef.current = promise;
+    await promise;
+  }, [roomsLoaded]);
+
+  const loadEventsForMonth = useCallback(
+    (monthDate: Date, options: { force?: boolean } = {}) => {
+      const { force = false } = options;
+      const monthKey = format(monthDate, "yyyy-MM");
+
+      if (!force && eventsCacheRef.current[monthKey]) {
+        return Promise.resolve(eventsCacheRef.current[monthKey]);
+      }
+
+      if (!force && pendingFetchesRef.current[monthKey]) {
+        return pendingFetchesRef.current[monthKey];
+      }
+
+      setLoadingMonths((prev) => ({ ...prev, [monthKey]: true }));
+
+      const startDate = format(startOfMonth(monthDate), "yyyy-MM-dd");
+      const endDate = format(endOfMonth(monthDate), "yyyy-MM-dd");
+
+      const fetchPromise = apiService
+        .getEvents(startDate, endDate)
+        .then((data) => {
+          eventsCacheRef.current = {
+            ...eventsCacheRef.current,
+            [monthKey]: data,
+          };
+          setEventsByMonth((prev) => {
+            if (prev[monthKey] === data) {
+              return prev;
+            }
+            return {
+              ...prev,
+              [monthKey]: data,
+            };
+          });
+          return data;
+        })
+        .catch((err) => {
+          console.error(`Error loading events for ${monthKey}:`, err);
+          eventsCacheRef.current = {
+            ...eventsCacheRef.current,
+          };
+          delete eventsCacheRef.current[monthKey];
+          throw err;
+        })
+        .finally(() => {
+          setLoadingMonths((prev) => {
+            const { [monthKey]: _removed, ...rest } = prev;
+            return rest;
+          });
+          delete pendingFetchesRef.current[monthKey];
+        });
+
+      pendingFetchesRef.current[monthKey] = fetchPromise;
+      return fetchPromise;
+    },
+    []
+  );
+
+  const handleLoadMonth = useCallback(
+    (monthDate: Date) => {
+      loadEventsForMonth(monthDate).catch((err) => {
+        console.error("Error loading month on demand:", err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error al cargar los eventos del mes solicitado."
+        );
+      });
+    },
+    [loadEventsForMonth]
+  );
+
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const selectedMonthKey = format(selectedMonth, "yyyy-MM");
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      const hasCachedMonth = !!eventsCacheRef.current[selectedMonthKey];
+
+      if (!hasCachedMonth) {
+        setLoading(true);
+      }
+
+      setError(null);
+
+      try {
+        await ensureRooms();
+        await loadEventsForMonth(selectedMonth, { force: false });
+
+        if (!eventsCacheRef.current[selectedMonthKey]) {
+          // Si por alguna razón no se cargó, no continúes
+          return;
+        }
+
+        if (isMounted) {
+          setInitialLoading(false);
+        }
+
+        // Prefetch del mes anterior para estadísticas de crecimiento
+        const previousMonth = subMonths(selectedMonth, 1);
+        const previousKey = format(previousMonth, "yyyy-MM");
+        if (!eventsCacheRef.current[previousKey]) {
+          loadEventsForMonth(previousMonth).catch((err) => {
+            console.warn("No se pudo precargar el mes anterior:", err);
+          });
+        }
+      } catch (err) {
+        console.error("Error loading dashboard data:", err);
+        if (isMounted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Error al cargar datos del dashboard."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedMonth, selectedMonthKey, ensureRooms, loadEventsForMonth]);
   const goPrevMonth = () =>
     setSelectedMonth((d) => startOfMonth(addMonths(d, -1)));
   const goNextMonth = () =>
@@ -117,146 +265,129 @@ export function Dashboard() {
     }
   };
 
-  // Eventos del mes seleccionado (derivado de allEvents)
-  const eventsInMonth = useMemo(() => {
-    const start = startOfMonth(selectedMonth);
-    const end = endOfMonth(selectedMonth);
-    return allEvents.filter((e: Event) => {
-      const eventStart = new Date(e.startDate);
-      return isWithinInterval(eventStart, { start, end });
-    });
-  }, [allEvents, selectedMonth]);
+  const eventsInMonth = eventsByMonth[selectedMonthKey] ?? [];
+  const previousMonthDate = subMonths(selectedMonth, 1);
+  const previousMonthKey = format(previousMonthDate, "yyyy-MM");
+  const previousMonthEvents = eventsByMonth[previousMonthKey] ?? [];
+  const previousMonthLoaded = !!eventsByMonth[previousMonthKey];
+  const isMonthLoading = loading || !!loadingMonths[selectedMonthKey];
 
-  // Calcular estadísticas
   const stats = useMemo(() => {
-    // Filtrar eventos según los filtros de estatus seleccionados
-    const filteredEvents = eventsInMonth.filter((event) => {
+    const filteredEvents = eventsInMonth.filter((event: Event) => {
       const statusCategory = classifyEventStatus(event);
-      return statsStatusFilters[statusCategory];
+      return statsStatusFilters[statusCategory] !== false;
     });
 
-    const now = new Date();
-    const lastMonth = subMonths(now, 1);
-    const lastMonthStart = startOfMonth(lastMonth);
-    const lastMonthEnd = endOfMonth(lastMonth);
+    const previousFiltered = previousMonthEvents.filter((event: Event) => {
+      const statusCategory = classifyEventStatus(event);
+      return statsStatusFilters[statusCategory] !== false;
+    });
 
-    const lastMonthEvents = allEvents
-      .filter((e) => {
-        const eventStart = new Date(e.startDate);
-        return isWithinInterval(eventStart, {
-          start: lastMonthStart,
-          end: lastMonthEnd,
-        });
-      })
-      .filter((event) => {
-        const statusCategory = classifyEventStatus(event);
-        return statsStatusFilters[statusCategory];
-      }).length;
+    const growthPercent =
+      previousFiltered.length > 0
+        ? ((filteredEvents.length - previousFiltered.length) /
+            previousFiltered.length) *
+          100
+        : null;
 
-    const growthNum =
-      lastMonthEvents > 0
-        ? ((filteredEvents.length - lastMonthEvents) / lastMonthEvents) * 100
-        : 0;
-
-    // Eventos próximos (futuros)
-    const upcomingEvents = filteredEvents.filter((e) =>
-      isFuture(startOfDay(new Date(e.startDate)))
+    const upcomingEvents = filteredEvents.filter((event: Event) =>
+      isFuture(startOfDay(new Date(event.startDate)))
     ).length;
 
-    // Eventos pasados este mes
-    const pastEvents = filteredEvents.filter((e) =>
-      isPast(startOfDay(new Date(e.endDate)))
+    const pastEvents = filteredEvents.filter((event: Event) =>
+      isPast(startOfDay(new Date(event.endDate)))
     ).length;
 
-    // PAX total estimado
-    const totalPax = filteredEvents.reduce(
-      (sum, e) => sum + (e.estimatedPax || 0),
-      0
-    );
+    const totalPax = filteredEvents.reduce((sum: number, event: Event) => {
+      return sum + (event.estimatedPax || 0);
+    }, 0);
 
     return {
       totalEvents: filteredEvents.length,
       rooms: rooms.length,
-      growth: growthNum.toFixed(1),
-      growthNum,
+      growthPercent,
       upcomingEvents,
       pastEvents,
       totalPax,
-      lastMonthEvents,
+      lastMonthEvents: previousFiltered.length,
+      lastMonthLoaded: previousMonthLoaded,
     };
-  }, [eventsInMonth, allEvents, rooms, statsStatusFilters]);
+  }, [
+    eventsInMonth,
+    previousMonthEvents,
+    previousMonthLoaded,
+    rooms,
+    statsStatusFilters,
+  ]);
 
-  // Distribución por estado (muestra todos pero se puede filtrar visualmente)
   const statusDistribution = useMemo(() => {
-    const filteredEvents = eventsInMonth.filter((event) => {
+    const filteredEvents = eventsInMonth.filter((event: Event) => {
       const statusCategory = classifyEventStatus(event);
-      return statsStatusFilters[statusCategory];
+      return statsStatusFilters[statusCategory] !== false;
     });
 
     const distribution: Record<string, number> = {};
-    filteredEvents.forEach((event) => {
+    filteredEvents.forEach((event: Event) => {
       const status = classifyEventStatus(event);
       distribution[status] = (distribution[status] || 0) + 1;
     });
     return distribution;
   }, [eventsInMonth, statsStatusFilters]);
 
-  // Tendencia mensual (últimos 6 meses)
   const monthlyTrend = useMemo(() => {
-    const now = new Date();
-    const months = [];
+    const months: Array<{
+      label: string;
+      key: string;
+      count: number | null;
+      loading: boolean;
+      date: Date;
+    }> = [];
 
     for (let i = 5; i >= 0; i--) {
-      const monthDate = subMonths(now, i);
-      const monthStart = startOfMonth(monthDate);
-      const monthEnd = endOfMonth(monthDate);
-
-      const count = allEvents
-        .filter((e) => {
-          const eventStart = new Date(e.startDate);
-          return isWithinInterval(eventStart, {
-            start: monthStart,
-            end: monthEnd,
-          });
-        })
-        .filter((event) => {
-          const statusCategory = classifyEventStatus(event);
-          return statsStatusFilters[statusCategory];
-        }).length;
+      const monthDate = subMonths(selectedMonth, i);
+      const monthKey = format(monthDate, "yyyy-MM");
+      const monthEvents = eventsByMonth[monthKey];
+      const filteredCount = monthEvents
+        ? monthEvents.filter((event: Event) => {
+            const statusCategory = classifyEventStatus(event);
+            return statsStatusFilters[statusCategory] !== false;
+          }).length
+        : null;
 
       months.push({
         label: format(monthDate, "MMM", { locale: es }),
-        count,
+        key: monthKey,
+        count: filteredCount,
+        loading: !!loadingMonths[monthKey],
+        date: monthDate,
       });
     }
 
     return months;
-  }, [allEvents, statsStatusFilters]);
+  }, [selectedMonth, eventsByMonth, statsStatusFilters, loadingMonths]);
 
-  // Eventos próximos ordenados
   const upcomingEventsList = useMemo(() => {
     return eventsInMonth
-      .filter((event) => {
+      .filter((event: Event) => {
         const statusCategory = classifyEventStatus(event);
-        return statsStatusFilters[statusCategory];
+        return statsStatusFilters[statusCategory] !== false;
       })
-      .filter((e) => isFuture(startOfDay(new Date(e.startDate))))
+      .filter((event: Event) => isFuture(startOfDay(new Date(event.startDate))))
       .sort(
-        (a, b) =>
+        (a: Event, b: Event) =>
           new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
       )
       .slice(0, 5);
   }, [eventsInMonth, statsStatusFilters]);
 
-  // Salones más utilizados
   const roomUsage = useMemo(() => {
-    const filteredEvents = eventsInMonth.filter((event) => {
+    const filteredEvents = eventsInMonth.filter((event: Event) => {
       const statusCategory = classifyEventStatus(event);
-      return statsStatusFilters[statusCategory];
+      return statsStatusFilters[statusCategory] !== false;
     });
 
     const usage: Record<string, number> = {};
-    filteredEvents.forEach((event) => {
+    filteredEvents.forEach((event: Event) => {
       if (event.eventRooms && Array.isArray(event.eventRooms)) {
         event.eventRooms.forEach((room: any) => {
           const roomName = room.roomName || room.name || "Sin nombre";
@@ -271,20 +402,17 @@ export function Dashboard() {
       .slice(0, 5);
   }, [eventsInMonth, statsStatusFilters]);
 
-  // Cotizaciones por Segmento de Mercado
   const quotationsBySegment = useMemo(() => {
     const segmentTotals: Record<string, number> = {};
 
-    eventsInMonth.forEach((event) => {
+    eventsInMonth.forEach((event: Event) => {
       const rawEvent = event as any;
 
-      // Filtrar por estatus según los filtros globales
       const statusCategory = classifyEventStatus(event);
       if (!statsStatusFilters[statusCategory]) {
-        return; // Saltar eventos cuyo estatus no está activo en las estadísticas
+        return;
       }
 
-      // Obtener el segmento de mercado
       const segmentName =
         rawEvent?.marketSegmentName ??
         rawEvent?.marketSegment?.marketSegmentName ??
@@ -293,10 +421,8 @@ export function Dashboard() {
         rawEvent?.marketSegment?.name ??
         "Sin segmento";
 
-      // Calcular total del evento (salones + servicios)
       let eventTotal = 0;
 
-      // Sumar salones
       if (rawEvent?.activities && Array.isArray(rawEvent.activities)) {
         rawEvent.activities.forEach((activity: any) => {
           if (activity.rooms && Array.isArray(activity.rooms)) {
@@ -306,7 +432,6 @@ export function Dashboard() {
             });
           }
 
-          // Sumar servicios
           if (activity.services && Array.isArray(activity.services)) {
             activity.services.forEach((service: any) => {
               const precio = service.priceTNI || service.priceTI || 0;
@@ -317,7 +442,6 @@ export function Dashboard() {
         });
       }
 
-      // Agregar al total del segmento
       if (eventTotal > 0) {
         segmentTotals[segmentName] =
           (segmentTotals[segmentName] || 0) + eventTotal;
@@ -330,18 +454,28 @@ export function Dashboard() {
       .slice(0, 5);
   }, [eventsInMonth, statsStatusFilters]);
 
-  const maxTrendValue = Math.max(...monthlyTrend.map((m) => m.count), 1);
+  const maxTrendValue = Math.max(
+    1,
+    ...monthlyTrend
+      .filter((month) => month.count !== null)
+      .map((month) => month.count as number)
+  );
   const maxStatusValue = Math.max(...Object.values(statusDistribution), 1);
   const maxQuotationValue = Math.max(
     ...quotationsBySegment.map((s) => s.total),
     1
   );
 
-  if (loading) {
+  const hasDataForSelectedMonth = eventsInMonth.length > 0;
+  const shouldShowInitialSpinner =
+    initialLoading && loading && !hasDataForSelectedMonth;
+  const showOverlay = !initialLoading && isMonthLoading;
+
+  if (shouldShowInitialSpinner) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-full">
-          <Spinner size="lg" label="Cargando dashboard..." />
+          <Spinner size="lg" label="Preparando dashboard..." />
         </div>
       </Layout>
     );
@@ -349,7 +483,21 @@ export function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="relative space-y-6">
+        {showOverlay && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-sm">
+            <div className="rounded-md border border-muted bg-background/90 px-6 py-4 shadow-lg">
+              <Spinner size="md" label="Actualizando información del mes..." />
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -446,11 +594,19 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {stats.growthNum > 0 ? "+" : ""}
-                {stats.growth}%
+                {stats.growthPercent !== null ? (
+                  <>
+                    {stats.growthPercent > 0 ? "+" : ""}
+                    {stats.growthPercent.toFixed(1)}%
+                  </>
+                ) : (
+                  "—"
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
-                vs mes anterior ({stats.lastMonthEvents} eventos)
+                {stats.lastMonthLoaded
+                  ? `vs mes anterior (${stats.lastMonthEvents} eventos)`
+                  : "Cargando datos del mes anterior…"}
               </p>
             </CardContent>
           </Card>
@@ -497,23 +653,57 @@ export function Dashboard() {
             <CardContent>
               <div className="space-y-3">
                 {monthlyTrend.map((month) => (
-                  <div key={month.label} className="space-y-1">
+                  <div key={month.key} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium capitalize">
                         {month.label}
                       </span>
                       <span className="text-muted-foreground">
-                        {month.count} eventos
+                        {month.count !== null
+                          ? `${month.count} evento${
+                              month.count === 1 ? "" : "s"
+                            }`
+                          : month.loading
+                          ? "Cargando…"
+                          : "Sin datos"}
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-500"
-                        style={{
-                          width: `${(month.count / maxTrendValue) * 100}%`,
-                        }}
-                      />
-                    </div>
+                    {month.count !== null ? (
+                      <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all duration-500"
+                          style={{
+                            width: `${
+                              month.count === 0
+                                ? 0
+                                : (month.count / maxTrendValue) * 100
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 pt-1">
+                        {month.loading ? (
+                          <>
+                            <span className="inline-flex h-4 w-4 animate-spin rounded-full border border-primary border-t-transparent" />
+                            <span className="text-xs text-muted-foreground">
+                              Cargando datos…
+                            </span>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleLoadMonth(month.date)}
+                            className="inline-flex items-center gap-2 text-xs font-medium text-primary hover:underline"
+                          >
+                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-primary">
+                              +
+                            </span>
+                            Cargar datos de este mes
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

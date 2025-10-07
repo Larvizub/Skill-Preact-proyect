@@ -53,9 +53,9 @@ export function Eventos() {
 
   // Filtros
   const [filterType, setFilterType] = useState<
-    "dateRange" | "eventId" | "eventName"
+    "dateRange" | "eventNumber" | "eventName"
   >("dateRange");
-  const [eventId, setEventId] = useState("");
+  const [eventNumber, setEventNumber] = useState("");
   const [eventName, setEventName] = useState("");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
@@ -70,7 +70,7 @@ export function Eventos() {
 
   const loadEvents = async () => {
     // Validar que haya criterios de búsqueda
-    if (filterType === "eventId" && !eventId.trim()) {
+    if (filterType === "eventNumber" && !eventNumber.trim()) {
       alert("Por favor ingresa un ID de evento");
       return;
     }
@@ -105,9 +105,13 @@ export function Eventos() {
       let data: Event[];
       if (filterType === "dateRange") {
         data = await apiService.getEvents(startDate, endDate);
-      } else if (filterType === "eventId") {
-        // Optimización: buscar directamente por ID en la API
-        data = await apiService.getEvents(undefined, undefined, eventId.trim());
+      } else if (filterType === "eventNumber") {
+        // Optimización: buscar directamente por ID de evento (Skill) en la API
+        data = await apiService.getEvents(
+          undefined,
+          undefined,
+          eventNumber.trim()
+        );
       } else if (filterType === "eventName") {
         // Optimización: buscar directamente por nombre en la API usando el parámetro 'title'
         data = await apiService.getEvents(
@@ -124,10 +128,36 @@ export function Eventos() {
       // Para búsqueda por ID y nombre, ya viene filtrado de la API
       // Solo filtramos adicionalmente si es necesario
       let filtered = data;
-      if (filterType === "eventId" && eventId.trim()) {
-        // Para ID, hacer filtrado adicional por si la API devuelve resultados parciales
+
+      if (filterType === "dateRange" && startDate && endDate) {
+        const startBoundary = new Date(`${startDate}T00:00:00`);
+        const endBoundary = new Date(`${endDate}T23:59:59`);
+
+        filtered = data.filter((eventItem: Event) => {
+          const eventStart = eventItem.startDate
+            ? new Date(eventItem.startDate)
+            : undefined;
+          const eventEnd = eventItem.endDate
+            ? new Date(eventItem.endDate)
+            : eventStart;
+
+          if (!eventStart && !eventEnd) {
+            return false;
+          }
+
+          const startToCompare = eventStart ?? eventEnd!;
+          const endToCompare = eventEnd ?? eventStart!;
+
+          return startToCompare <= endBoundary && endToCompare >= startBoundary;
+        });
+      }
+
+      if (filterType === "eventNumber" && eventNumber.trim()) {
+        // Para ID de evento, hacer filtrado adicional por si la API devuelve resultados parciales
         filtered = data.filter((eventItem: Event) =>
-          eventItem.idEvent.toString().includes(eventId.trim())
+          ((eventItem as any)?.eventNumber ?? "")
+            .toString()
+            .includes(eventNumber.trim())
         );
       }
       // Para búsqueda por nombre, la API ya filtra, no necesitamos filtrado adicional
@@ -147,7 +177,7 @@ export function Eventos() {
   };
 
   const clearFilters = () => {
-    setEventId("");
+    setEventNumber("");
     setEventName("");
     const now = new Date();
     setStartDate(now.toISOString().split("T")[0]);
@@ -168,7 +198,7 @@ export function Eventos() {
     );
     // Guardar la página de origen para el botón "Volver"
     sessionStorage.setItem("eventDetailOrigin", "/eventos");
-    route(`/eventos/${event.idEvent}`);
+    route(`/eventos/${(event as any)?.eventNumber ?? event.idEvent}`);
   };
 
   const toggleStatusFilter = (id: StatusCategory) => {
@@ -312,16 +342,10 @@ export function Eventos() {
   );
 
   const hiddenByFilters = events.length - filteredEvents.length;
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center h-full">
-          <Spinner size="lg" label="Cargando eventos..." />
-        </div>
-      </Layout>
-    );
-  }
+  const showEmptyState = !loading && events.length === 0;
+  const showFilteredEmptyState =
+    !loading && events.length > 0 && filteredEvents.length === 0;
+  const hasVisibleEvents = filteredEvents.length > 0;
 
   return (
     <Layout>
@@ -330,8 +354,8 @@ export function Eventos() {
           <div>
             <h1 className="text-3xl font-bold">Eventos</h1>
             <p className="text-muted-foreground">
-              Busca eventos por ID, nombre o rango de fechas (máximo 6 meses
-              para búsqueda por fechas)
+              Busca eventos por ID (Skill), nombre o rango de fechas (máximo 6
+              meses para búsqueda por fechas)
             </p>
           </div>
         </div>
@@ -356,13 +380,13 @@ export function Eventos() {
                     setFilterType(
                       (e.target as HTMLSelectElement).value as
                         | "dateRange"
-                        | "eventId"
+                        | "eventNumber"
                         | "eventName"
                     )
                   }
                 >
                   <option value="dateRange">Rango de Fechas</option>
-                  <option value="eventId">ID del Evento</option>
+                  <option value="eventNumber">ID del Evento (Skill)</option>
                   <option value="eventName">Nombre del Evento</option>
                 </Select>
               </div>
@@ -397,18 +421,18 @@ export function Eventos() {
                 </div>
               )}
 
-              {filterType === "eventId" && (
+              {filterType === "eventNumber" && (
                 <div className="grid gap-2">
-                  <Label htmlFor="eventId">ID del Evento</Label>
+                  <Label htmlFor="eventNumber">ID del Evento (Skill)</Label>
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="eventId"
+                      id="eventNumber"
                       placeholder="Ej: 12345"
                       className="pl-10"
-                      value={eventId}
+                      value={eventNumber}
                       onInput={(e) =>
-                        setEventId((e.target as HTMLInputElement).value)
+                        setEventNumber((e.target as HTMLInputElement).value)
                       }
                     />
                   </div>
@@ -535,99 +559,126 @@ export function Eventos() {
             <CardTitle>Lista de Eventos</CardTitle>
           </CardHeader>
           <CardContent>
-            {events.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">
-                  No se encontraron eventos
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Usa los filtros de arriba para buscar
-                </p>
-              </div>
-            ) : filteredEvents.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">
-                  No hay eventos con los filtros seleccionados
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Ajusta los filtros de estatus o segmento para ver resultados
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[70px]">ID</TableHead>
-                      <TableHead>Evento</TableHead>
-                      <TableHead>Fecha Inicio</TableHead>
-                      <TableHead>Fecha Fin</TableHead>
-                      <TableHead>Estatus</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEvents.map((event) => {
-                      const statusText = getEventStatusText(event);
-                      const statusColor = getEventStatusColor(event);
+            <div className="relative">
+              {loading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/70 backdrop-blur-sm">
+                  <Spinner size="lg" label="Cargando eventos..." />
+                </div>
+              )}
+              {showEmptyState ? (
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground">
+                    No se encontraron eventos
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Usa los filtros de arriba para buscar
+                  </p>
+                </div>
+              ) : showFilteredEmptyState ? (
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground">
+                    No hay eventos con los filtros seleccionados
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Ajusta los filtros de estatus o segmento para ver resultados
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[110px]">
+                          ID Evento (Skill)
+                        </TableHead>
+                        <TableHead>Evento</TableHead>
+                        <TableHead>Fecha Inicio</TableHead>
+                        <TableHead>Fecha Fin</TableHead>
+                        <TableHead>Estatus</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {hasVisibleEvents ? (
+                        filteredEvents.map((event) => {
+                          const statusText = getEventStatusText(event);
+                          const statusColor = getEventStatusColor(event);
 
-                      return (
-                        <TableRow key={event.idEvent}>
-                          <TableCell className="font-mono text-xs">
-                            {event.idEvent}
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{event.title}</p>
-                              {event.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-1">
-                                  {event.description}
-                                </p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2 text-sm">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              {new Date(event.startDate).toLocaleDateString(
-                                "es-ES"
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {new Date(event.endDate).toLocaleDateString(
-                              "es-ES"
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span
-                                className={`inline-flex h-3 w-3 rounded-full ${statusColor}`}
-                              />
-                              <span className="line-clamp-2">
-                                {statusText || "No especificado"}
-                              </span>
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEventClick(event)}
+                          return (
+                            <TableRow
+                              key={
+                                (event as any)?.eventNumber?.toString() ??
+                                event.idEvent
+                              }
                             >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Ver
-                            </Button>
+                              <TableCell className="font-mono text-xs">
+                                {(event as any)?.eventNumber ?? "-"}
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{event.title}</p>
+                                  {event.description && (
+                                    <p className="text-xs text-muted-foreground line-clamp-1">
+                                      {event.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                                  {new Date(event.startDate).toLocaleDateString(
+                                    "es-ES"
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {new Date(event.endDate).toLocaleDateString(
+                                  "es-ES"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <span
+                                    className={`inline-flex h-3 w-3 rounded-full ${statusColor}`}
+                                  />
+                                  <span className="line-clamp-2">
+                                    {statusText || "No especificado"}
+                                  </span>
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEventClick(event)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Ver
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="text-center text-sm text-muted-foreground"
+                          >
+                            {loading
+                              ? "Preparando resultados…"
+                              : "No hay eventos disponibles para mostrar."}
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -44,28 +44,31 @@ export function TableRow({ children, className }: TableProps) {
 interface TableCellProps {
   children: ComponentChildren;
   className?: string;
+  colSpan?: number;
 }
 
-export function TableHead({ children, className }: TableCellProps) {
+export function TableHead({ children, className, colSpan }: TableCellProps) {
   return (
     <th
       className={cn(
         "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
         className
       )}
+      colSpan={colSpan}
     >
       {children}
     </th>
   );
 }
 
-export function TableCell({ children, className }: TableCellProps) {
+export function TableCell({ children, className, colSpan }: TableCellProps) {
   return (
     <td
       className={cn(
         "p-4 align-middle [&:has([role=checkbox])]:pr-0",
         className
       )}
+      colSpan={colSpan}
     >
       {children}
     </td>

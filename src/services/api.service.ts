@@ -763,11 +763,12 @@ export const apiService = {
   getEvents: async (
     startDate?: string,
     endDate?: string,
-    eventId?: string,
+    eventNumber?: string,
     eventName?: string
   ) => {
-    // Si se proporciona eventId, buscar por ID específico
-    if (eventId) {
+    // Si se proporciona eventNumber, buscar por identificador específico (ID de Evento en Skill)
+    if (eventNumber) {
+      const numericEventNumber = Number(eventNumber);
       return withFallback(
         () =>
           apiRequest<
@@ -778,7 +779,7 @@ export const apiService = {
             method: "POST",
             body: JSON.stringify({
               Events: {
-                idEvent: parseInt(eventId),
+                eventNumber: numericEventNumber,
               },
             }),
           }),
@@ -790,16 +791,27 @@ export const apiService = {
           }>("/GetEvents", {
             method: "POST",
             body: buildPayload({
-              idEvent: parseInt(eventId),
+              eventNumber: numericEventNumber,
             }),
           })
       ).then((payload) => {
-        if (Array.isArray(payload)) return payload;
-        if (Array.isArray((payload as any)?.events))
-          return (payload as any).events;
-        if (Array.isArray((payload as any)?.result?.events))
-          return (payload as any).result.events;
-        return [];
+        let events: Event[] = [];
+        if (Array.isArray(payload)) events = payload as Event[];
+        else if (Array.isArray((payload as any)?.events))
+          events = (payload as any).events;
+        else if (Array.isArray((payload as any)?.result?.events))
+          events = (payload as any).result.events;
+
+        if (!events || events.length === 0) return [];
+
+        return events.filter((eventItem: Event) => {
+          const eventNumberValue = (eventItem as any)?.eventNumber;
+          const idValue = eventItem?.idEvent;
+          return (
+            eventNumberValue?.toString() === eventNumber ||
+            idValue?.toString() === eventNumber
+          );
+        });
       });
     }
 

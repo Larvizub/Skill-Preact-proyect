@@ -307,7 +307,7 @@ export function Calendario() {
     sessionStorage.setItem("eventDetailOrigin", "/calendario");
 
     // Navegar a la página de detalle
-    route(`/eventos/${event.idEvent}`);
+    route(`/eventos/${(event as any)?.eventNumber ?? event.idEvent}`);
   };
 
   const selectedDateEvents: Event[] = selectedDate
@@ -547,6 +547,7 @@ export function Calendario() {
                                     return (
                                       <div
                                         key={`${
+                                          (event as any)?.eventNumber ??
                                           event.idEvent
                                         }-${day.toISOString()}`}
                                         className={`${colorClass} ${textColorClass} text-[10px] px-1 py-0.5 rounded shadow-sm truncate pointer-events-auto cursor-pointer transition-transform duration-200 transform will-change-transform flex items-center gap-1 ${radiusClasses}`}
