@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { route } from "preact-router";
 import { Layout } from "../components/layout/Layout";
 import {
@@ -52,6 +52,108 @@ export function Eventos() {
   const [baseSegments, setBaseSegments] = useState<SegmentOption[]>([]);
   const [segmentsLoading, setSegmentsLoading] = useState(true);
 
+  const resolveEventDateRange = useCallback((event: Event) => {
+    const rawEvent = event as any;
+    const startCandidates: Date[] = [];
+    const endCandidates: Date[] = [];
+
+    const pushCandidate = (value: unknown, bucket: Date[]) => {
+      if (value == null) {
+        return;
+      }
+
+      if (value instanceof Date) {
+        if (!Number.isNaN(value.getTime())) {
+          bucket.push(value);
+        }
+        return;
+      }
+
+      if (typeof value === "number") {
+        const date = new Date(value);
+        if (!Number.isNaN(date.getTime())) {
+          bucket.push(date);
+        }
+        return;
+      }
+
+      if (typeof value === "string") {
+        const parsed =
+          parseDateLocal(value) ??
+          (() => {
+            const byNative = new Date(value);
+            return Number.isNaN(byNative.getTime()) ? null : byNative;
+          })();
+
+        if (parsed) {
+          bucket.push(parsed);
+        }
+      }
+    };
+
+    pushCandidate(rawEvent?.startDate, startCandidates);
+    pushCandidate(rawEvent?.StartDate, startCandidates);
+    pushCandidate(rawEvent?.eventStartDate, startCandidates);
+    pushCandidate(rawEvent?.endDate, endCandidates);
+    pushCandidate(rawEvent?.EndDate, endCandidates);
+    pushCandidate(rawEvent?.eventEndDate, endCandidates);
+
+    if (Array.isArray(rawEvent?.activities)) {
+      rawEvent.activities.forEach((activity: any) => {
+        pushCandidate(
+          activity?.activityDate ?? activity?.startDate ?? activity?.date,
+          startCandidates
+        );
+        pushCandidate(
+          activity?.activityDate ?? activity?.endDate ?? activity?.finishDate,
+          endCandidates
+        );
+
+        if (Array.isArray(activity?.rooms)) {
+          activity.rooms.forEach((room: any) => {
+            pushCandidate(room?.startDate ?? room?.date, startCandidates);
+            pushCandidate(room?.endDate ?? room?.finishDate, endCandidates);
+          });
+        }
+      });
+    }
+
+    if (Array.isArray(rawEvent?.eventRooms)) {
+      rawEvent.eventRooms.forEach((room: any) => {
+        pushCandidate(room?.startDate ?? room?.date, startCandidates);
+        pushCandidate(room?.endDate ?? room?.finishDate, endCandidates);
+      });
+    }
+
+    if (startCandidates.length === 0 && endCandidates.length === 0) {
+      return { start: null, end: null };
+    }
+
+    const start =
+      startCandidates.length > 0
+        ? new Date(
+            Math.min(...startCandidates.map((candidate) => candidate.getTime()))
+          )
+        : endCandidates.length > 0
+        ? new Date(
+            Math.min(...endCandidates.map((candidate) => candidate.getTime()))
+          )
+        : null;
+
+    const end =
+      endCandidates.length > 0
+        ? new Date(
+            Math.max(...endCandidates.map((candidate) => candidate.getTime()))
+          )
+        : startCandidates.length > 0
+        ? new Date(
+            Math.max(...startCandidates.map((candidate) => candidate.getTime()))
+          )
+        : null;
+
+    return { start, end };
+  }, []);
+
   // Filtros
   const [filterType, setFilterType] = useState<
     "dateRange" | "eventNumber" | "eventName"
@@ -104,17 +206,32 @@ export function Eventos() {
 
     try {
       let data: Event[];
+
+      const toISODate = (date: Date) => date.toISOString().split("T")[0];
+
       if (filterType === "dateRange") {
-        data = await apiService.getEvents(startDate, endDate);
+        const start =
+          parseDateLocal(startDate) ?? new Date(`${startDate}T00:00:00`);
+        const end = parseDateLocal(endDate) ?? new Date(`${endDate}T00:00:00`);
+
+        // Extender el rango solicitado para incluir eventos que empiecen
+        // ligeramente antes o terminen después del intervalo filtrado.
+        const bufferedStart = new Date(start);
+        bufferedStart.setDate(bufferedStart.getDate() - 7);
+        const bufferedEnd = new Date(end);
+        bufferedEnd.setDate(bufferedEnd.getDate() + 7);
+
+        data = await apiService.getEvents(
+          toISODate(bufferedStart),
+          toISODate(bufferedEnd)
+        );
       } else if (filterType === "eventNumber") {
-        // Optimización: buscar directamente por ID de evento (Skill) en la API
         data = await apiService.getEvents(
           undefined,
           undefined,
           eventNumber.trim()
         );
       } else if (filterType === "eventName") {
-        // Optimización: buscar directamente por nombre en la API usando el parámetro 'title'
         data = await apiService.getEvents(
           undefined,
           undefined,
@@ -122,52 +239,45 @@ export function Eventos() {
           eventName.trim()
         );
       } else {
-        // Fallback por si acaso
         data = await apiService.getEvents();
       }
 
-      // Para búsqueda por ID y nombre, ya viene filtrado de la API
-      // Solo filtramos adicionalmente si es necesario
-      let filtered = data;
+      const deduped = new Map<string | number, Event>();
+      data.forEach((eventItem) => {
+        const key =
+          (eventItem as any)?.eventNumber ??
+          eventItem.idEvent ??
+          `${eventItem.title}-${eventItem.startDate}`;
 
-      if (filterType === "dateRange" && startDate && endDate) {
-        const startBoundary =
-          parseDateLocal(startDate) ?? new Date(`${startDate}T00:00:00`);
-        const endBoundary =
-          parseDateLocal(endDate) ?? new Date(`${endDate}T00:00:00`);
-        endBoundary.setHours(23, 59, 59, 999);
+        if (!deduped.has(key)) {
+          deduped.set(key, eventItem);
+          return;
+        }
 
-        filtered = data.filter((eventItem: Event) => {
-          const eventStart =
-            parseDateLocal(eventItem.startDate) ??
-            (eventItem.startDate ? new Date(eventItem.startDate) : undefined);
-          const eventEnd =
-            parseDateLocal(eventItem.endDate) ??
-            (eventItem.endDate ? new Date(eventItem.endDate) : eventStart);
+        const existing = deduped.get(key)!;
+        const currentActivities = Array.isArray((existing as any)?.activities)
+          ? (existing as any).activities.length
+          : 0;
+        const incomingActivities = Array.isArray((eventItem as any)?.activities)
+          ? (eventItem as any).activities.length
+          : 0;
 
-          if (!eventStart && !eventEnd) {
-            return false;
-          }
+        if (incomingActivities > currentActivities) {
+          deduped.set(key, eventItem);
+        }
+      });
 
-          const startToCompare = eventStart ?? eventEnd!;
-          const endToCompare = eventEnd ?? eventStart!;
-
-          return startToCompare <= endBoundary && endToCompare >= startBoundary;
-        });
-      }
+      let normalized = Array.from(deduped.values());
 
       if (filterType === "eventNumber" && eventNumber.trim()) {
-        // Para ID de evento, hacer filtrado adicional por si la API devuelve resultados parciales
-        filtered = data.filter((eventItem: Event) =>
+        normalized = normalized.filter((eventItem: Event) =>
           ((eventItem as any)?.eventNumber ?? "")
             .toString()
             .includes(eventNumber.trim())
         );
       }
-      // Para búsqueda por nombre, la API ya filtra, no necesitamos filtrado adicional
-      // El filtrado adicional puede causar problemas de rendimiento
 
-      setEvents(filtered);
+      setEvents(normalized);
     } catch (error) {
       console.error("Error loading events:", error);
       alert("Error al cargar eventos. Por favor intenta de nuevo.");
@@ -331,9 +441,38 @@ export function Eventos() {
     });
   }, [availableSegments]);
 
+  const dateRangeBounds = useMemo(() => {
+    if (filterType !== "dateRange" || !startDate || !endDate) {
+      return null;
+    }
+
+    const startBoundary =
+      parseDateLocal(startDate) ?? new Date(`${startDate}T00:00:00`);
+    const endBoundary =
+      parseDateLocal(endDate) ?? new Date(`${endDate}T00:00:00`);
+    endBoundary.setHours(23, 59, 59, 999);
+
+    return { startBoundary, endBoundary };
+  }, [filterType, startDate, endDate]);
+
   const filteredEvents = useMemo(
     () =>
       events.filter((event) => {
+        if (dateRangeBounds) {
+          const { startBoundary, endBoundary } = dateRangeBounds;
+          const { start: eventStart, end: eventEnd } =
+            resolveEventDateRange(event);
+
+          if (eventStart || eventEnd) {
+            const startToCompare = eventStart ?? eventEnd!;
+            const endToCompare = eventEnd ?? eventStart!;
+
+            if (startToCompare > endBoundary || endToCompare < startBoundary) {
+              return false;
+            }
+          }
+        }
+
         const statusCategory = classifyEventStatus(event);
         const statusActive = statusFilters[statusCategory] !== false;
 
@@ -342,7 +481,13 @@ export function Eventos() {
 
         return statusActive && segmentActive;
       }),
-    [events, statusFilters, segmentFilters]
+    [
+      events,
+      statusFilters,
+      segmentFilters,
+      dateRangeBounds,
+      resolveEventDateRange,
+    ]
   );
 
   const hiddenByFilters = events.length - filteredEvents.length;
