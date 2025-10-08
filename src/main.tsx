@@ -23,6 +23,9 @@ function App() {
       <Router>
         {/* @ts-ignore - preact-router path prop types */}
         <Login path="/" />
+        {/* Alias path for explicit login route so redirects to /login work */}
+        {/* @ts-ignore - preact-router path prop types */}
+        <Login path="/login" />
         {/* @ts-ignore - preact-router path prop types */}
         <ApiTest path="/api-test" />
         {/* @ts-ignore - preact-router path prop types */}

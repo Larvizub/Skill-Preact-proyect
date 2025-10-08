@@ -1,4 +1,5 @@
 import { API_CONFIG, authService } from "./auth.service";
+import { route } from "preact-router";
 
 // Función genérica para hacer peticiones a la API
 async function apiRequest<T>(
@@ -24,8 +25,20 @@ async function apiRequest<T>(
   if (!response.ok) {
     // Si es 401, el token expiró - limpiar sesión y redirigir
     if (response.status === 401) {
+      // Token inválido/expirado: limpiar sesión y navegar usando el router SPA.
       authService.logout();
-      window.location.href = "/login";
+      try {
+        // Use preact-router's route to avoid full page reload and ensure the
+        // Login component mounted at /login is used.
+        route("/login", true);
+      } catch (e) {
+        // Fallback a window.location si por alguna razón route falla
+        console.warn(
+          "preact-router route() falló, usando window.location as fallback",
+          e
+        );
+        window.location.href = "/login";
+      }
       throw new Error("Sesión expirada. Por favor, inicia sesión nuevamente.");
     }
     const text = await response.text();
