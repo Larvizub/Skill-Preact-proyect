@@ -41,6 +41,9 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [cotizacionExpanded, setCotizacionExpanded] = useState(false);
+  const [actividadesExpanded, setActividadesExpanded] = useState(false);
+  const [salonesExpanded, setSalonesExpanded] = useState(false);
+  const [serviciosExpanded, setServiciosExpanded] = useState(false);
   const [catalogServices, setCatalogServices] = useState<any[]>([]);
 
   useEffect(() => {
@@ -636,67 +639,81 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
           {(event as any)?.activities &&
             (event as any).activities.length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Clock className="h-5 w-5" />
-                    Actividades ({(event as any).activities.length})
+                <CardHeader
+                  className="cursor-pointer hover:bg-accent/50 transition-colors rounded-t-lg"
+                  onClick={() => setActividadesExpanded(!actividadesExpanded)}
+                >
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      Actividades ({(event as any).activities.length})
+                    </div>
+                    <ChevronDown
+                      className={`h-5 w-5 transition-transform duration-200 ${
+                        actividadesExpanded ? "rotate-180" : ""
+                      }`}
+                    />
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {(event as any).activities.map(
-                      (activity: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="p-3 rounded-lg bg-muted space-y-2"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-sm">
-                                  {activity.activityType?.activityTypeName ||
-                                    "Actividad"}
-                                </p>
-                                {activity.eventStatusDescription && (
-                                  <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
-                                    {activity.eventStatusDescription}
-                                  </span>
+                {actividadesExpanded && (
+                  <CardContent>
+                    <div className="space-y-3">
+                      {(event as any).activities.map(
+                        (activity: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-lg bg-muted space-y-2"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-sm">
+                                    {activity.activityType?.activityTypeName ||
+                                      "Actividad"}
+                                  </p>
+                                  {activity.eventStatusDescription && (
+                                    <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
+                                      {activity.eventStatusDescription}
+                                    </span>
+                                  )}
+                                </div>
+                                {activity.room && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {activity.room.roomName}
+                                  </div>
                                 )}
                               </div>
-                              {activity.room && (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                                  <MapPin className="h-3 w-3" />
-                                  {activity.room.roomName}
-                                </div>
-                              )}
+                              <div className="text-right text-xs text-muted-foreground">
+                                {activity.activityDate && (
+                                  <p>
+                                    {formatDateLocal(activity.activityDate)}
+                                  </p>
+                                )}
+                                {activity.startTime && activity.endTime && (
+                                  <p>
+                                    {activity.startTime} - {activity.endTime}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-right text-xs text-muted-foreground">
-                              {activity.activityDate && (
-                                <p>{formatDateLocal(activity.activityDate)}</p>
-                              )}
-                              {activity.startTime && activity.endTime && (
-                                <p>
-                                  {activity.startTime} - {activity.endTime}
-                                </p>
-                              )}
-                            </div>
+                            {activity.activityComments && (
+                              <p className="text-xs text-muted-foreground">
+                                {activity.activityComments}
+                              </p>
+                            )}
+                            {activity.estimatedPax && (
+                              <div className="flex items-center gap-1 text-xs">
+                                <Users className="h-3 w-3" />
+                                PAX: {activity.estimatedPax}
+                              </div>
+                            )}
                           </div>
-                          {activity.activityComments && (
-                            <p className="text-xs text-muted-foreground">
-                              {activity.activityComments}
-                            </p>
-                          )}
-                          {activity.estimatedPax && (
-                            <div className="flex items-center gap-1 text-xs">
-                              <Users className="h-3 w-3" />
-                              PAX: {activity.estimatedPax}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                </CardContent>
+                        )
+                      )}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
 
@@ -706,157 +723,169 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
               (a: any) => a.rooms && a.rooms.length > 0
             ) && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Home className="h-5 w-5" />
-                    Salones
+                <CardHeader
+                  className="cursor-pointer hover:bg-accent/50 transition-colors rounded-t-lg"
+                  onClick={() => setSalonesExpanded(!salonesExpanded)}
+                >
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    <div className="flex items-center gap-2">
+                      <Home className="h-5 w-5" />
+                      Salones
+                    </div>
+                    <ChevronDown
+                      className={`h-5 w-5 transition-transform duration-200 ${
+                        salonesExpanded ? "rotate-180" : ""
+                      }`}
+                    />
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {(() => {
-                      // Agrupar salones por scheduleDescription (de la actividad) o por fecha
-                      const roomsBySchedule: { [key: string]: any[] } = {};
-                      (event as any).activities
-                        .filter(
-                          (activity: any) =>
-                            activity.rooms && activity.rooms.length > 0
-                        )
-                        .forEach((activity: any) => {
-                          activity.rooms.forEach((room: any) => {
-                            // Intentar obtener scheduleDescription de la actividad o del room
-                            const scheduleKey =
-                              activity.scheduleDescription ||
-                              room.schedule?.scheduleDescription ||
-                              (activity.activityDate
-                                ? formatDateLocal(
-                                    activity.activityDate,
-                                    "es-ES",
-                                    {
-                                      year: "numeric",
-                                      month: "long",
-                                      day: "numeric",
-                                    }
-                                  )
-                                : "Sin horario especificado");
+                {salonesExpanded && (
+                  <CardContent>
+                    <div className="space-y-4">
+                      {(() => {
+                        // Agrupar salones por scheduleDescription (de la actividad) o por fecha
+                        const roomsBySchedule: { [key: string]: any[] } = {};
+                        (event as any).activities
+                          .filter(
+                            (activity: any) =>
+                              activity.rooms && activity.rooms.length > 0
+                          )
+                          .forEach((activity: any) => {
+                            activity.rooms.forEach((room: any) => {
+                              // Intentar obtener scheduleDescription de la actividad o del room
+                              const scheduleKey =
+                                activity.scheduleDescription ||
+                                room.schedule?.scheduleDescription ||
+                                (activity.activityDate
+                                  ? formatDateLocal(
+                                      activity.activityDate,
+                                      "es-ES",
+                                      {
+                                        year: "numeric",
+                                        month: "long",
+                                        day: "numeric",
+                                      }
+                                    )
+                                  : "Sin horario especificado");
 
-                            if (!roomsBySchedule[scheduleKey])
-                              roomsBySchedule[scheduleKey] = [];
-                            roomsBySchedule[scheduleKey].push({
-                              ...room,
-                              activity,
+                              if (!roomsBySchedule[scheduleKey])
+                                roomsBySchedule[scheduleKey] = [];
+                              roomsBySchedule[scheduleKey].push({
+                                ...room,
+                                activity,
+                              });
                             });
                           });
-                        });
 
-                      const sortedSchedules = Object.keys(roomsBySchedule).sort(
-                        (a, b) => {
+                        const sortedSchedules = Object.keys(
+                          roomsBySchedule
+                        ).sort((a, b) => {
                           if (a === "Sin horario especificado") return 1;
                           if (b === "Sin horario especificado") return -1;
                           return a.localeCompare(b);
-                        }
-                      );
+                        });
 
-                      return sortedSchedules.map((scheduleKey) => (
-                        <div key={scheduleKey} className="space-y-2">
-                          {/* Header del grupo con scheduleDescription o fecha */}
-                          <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            {scheduleKey}
-                          </h4>
+                        return sortedSchedules.map((scheduleKey) => (
+                          <div key={scheduleKey} className="space-y-2">
+                            {/* Header del grupo con scheduleDescription o fecha */}
+                            <h4 className="font-semibold text-sm flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              {scheduleKey}
+                            </h4>
 
-                          {/* Lista de salones (una columna) */}
-                          <div className="space-y-2 ml-6">
-                            {roomsBySchedule[scheduleKey].map(
-                              (item: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="p-3 rounded-lg bg-muted space-y-2"
-                                >
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <p className="font-medium text-sm">
-                                        {item.roomName || "Salón sin nombre"}
-                                      </p>
-                                      {item.roomCode && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          Código: {item.roomCode}
+                            {/* Lista de salones (una columna) */}
+                            <div className="space-y-2 ml-6">
+                              {roomsBySchedule[scheduleKey].map(
+                                (item: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="p-3 rounded-lg bg-muted space-y-2"
+                                  >
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <p className="font-medium text-sm">
+                                          {item.roomName || "Salón sin nombre"}
                                         </p>
-                                      )}
-
-                                      {/* Fecha de la actividad */}
-                                      {item.activity?.activityDate && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          📅 Fecha Actividad:{" "}
-                                          {formatDateLocal(
-                                            item.activity.activityDate,
-                                            "es-ES",
-                                            {
-                                              year: "numeric",
-                                              month: "long",
-                                              day: "numeric",
-                                            }
-                                          )}
-                                        </p>
-                                      )}
-
-                                      {item.activity?.activityType
-                                        ?.activityTypeName && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          Actividad:{" "}
-                                          {
-                                            item.activity.activityType
-                                              .activityTypeName
-                                          }
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div className="text-right text-xs text-muted-foreground">
-                                      {item.activity?.startTime &&
-                                        item.activity?.endTime && (
-                                          <p>
-                                            {item.activity.startTime} -{" "}
-                                            {item.activity.endTime}
+                                        {item.roomCode && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Código: {item.roomCode}
                                           </p>
                                         )}
+
+                                        {/* Fecha de la actividad */}
+                                        {item.activity?.activityDate && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            📅 Fecha Actividad:{" "}
+                                            {formatDateLocal(
+                                              item.activity.activityDate,
+                                              "es-ES",
+                                              {
+                                                year: "numeric",
+                                                month: "long",
+                                                day: "numeric",
+                                              }
+                                            )}
+                                          </p>
+                                        )}
+
+                                        {item.activity?.activityType
+                                          ?.activityTypeName && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Actividad:{" "}
+                                            {
+                                              item.activity.activityType
+                                                .activityTypeName
+                                            }
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div className="text-right text-xs text-muted-foreground">
+                                        {item.activity?.startTime &&
+                                          item.activity?.endTime && (
+                                            <p>
+                                              {item.activity.startTime} -{" "}
+                                              {item.activity.endTime}
+                                            </p>
+                                          )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2 text-xs">
-                                    {item.roomMt2 && (
-                                      <div>
-                                        <span className="text-muted-foreground">
-                                          Área:{" "}
-                                        </span>
-                                        <span className="font-medium">
-                                          {item.roomMt2} m²
-                                        </span>
-                                      </div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                      {item.roomMt2 && (
+                                        <div>
+                                          <span className="text-muted-foreground">
+                                            Área:{" "}
+                                          </span>
+                                          <span className="font-medium">
+                                            {item.roomMt2} m²
+                                          </span>
+                                        </div>
+                                      )}
+                                      {item.roomHeight && (
+                                        <div>
+                                          <span className="text-muted-foreground">
+                                            Altura:{" "}
+                                          </span>
+                                          <span className="font-medium">
+                                            {item.roomHeight} m
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {item.roomComments && (
+                                      <p className="text-xs text-muted-foreground pt-2 border-t">
+                                        {item.roomComments}
+                                      </p>
                                     )}
-                                    {item.roomHeight && (
-                                      <div>
-                                        <span className="text-muted-foreground">
-                                          Altura:{" "}
-                                        </span>
-                                        <span className="font-medium">
-                                          {item.roomHeight} m
-                                        </span>
-                                      </div>
-                                    )}
                                   </div>
-                                  {item.roomComments && (
-                                    <p className="text-xs text-muted-foreground pt-2 border-t">
-                                      {item.roomComments}
-                                    </p>
-                                  )}
-                                </div>
-                              )
-                            )}
+                                )
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </CardContent>
+                        ));
+                      })()}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
 
@@ -866,211 +895,223 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
               (a: any) => a.services && a.services.length > 0
             ) && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Package className="h-5 w-5" />
-                    Servicios
+                <CardHeader
+                  className="cursor-pointer hover:bg-accent/50 transition-colors rounded-t-lg"
+                  onClick={() => setServiciosExpanded(!serviciosExpanded)}
+                >
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Servicios
+                    </div>
+                    <ChevronDown
+                      className={`h-5 w-5 transition-transform duration-200 ${
+                        serviciosExpanded ? "rotate-180" : ""
+                      }`}
+                    />
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {(() => {
-                      // Agrupar servicios por scheduleDescription del objeto schedule
-                      const servicesBySchedule: { [key: string]: any[] } = {};
-                      (event as any).activities
-                        .filter(
-                          (activity: any) =>
-                            activity.services && activity.services.length > 0
-                        )
-                        .forEach((activity: any) => {
-                          activity.services.forEach((service: any) => {
-                            // Usar schedule.scheduleDescription del servicio
-                            const scheduleKey =
-                              service.schedule?.scheduleDescription ||
-                              "Sin horario especificado";
-                            if (!servicesBySchedule[scheduleKey])
-                              servicesBySchedule[scheduleKey] = [];
-                            servicesBySchedule[scheduleKey].push({
-                              ...service,
-                              activity, // Incluir la actividad completa para acceder a su fecha
+                {serviciosExpanded && (
+                  <CardContent>
+                    <div className="space-y-4">
+                      {(() => {
+                        // Agrupar servicios por scheduleDescription del objeto schedule
+                        const servicesBySchedule: { [key: string]: any[] } = {};
+                        (event as any).activities
+                          .filter(
+                            (activity: any) =>
+                              activity.services && activity.services.length > 0
+                          )
+                          .forEach((activity: any) => {
+                            activity.services.forEach((service: any) => {
+                              // Usar schedule.scheduleDescription del servicio
+                              const scheduleKey =
+                                service.schedule?.scheduleDescription ||
+                                "Sin horario especificado";
+                              if (!servicesBySchedule[scheduleKey])
+                                servicesBySchedule[scheduleKey] = [];
+                              servicesBySchedule[scheduleKey].push({
+                                ...service,
+                                activity, // Incluir la actividad completa para acceder a su fecha
+                              });
                             });
                           });
+
+                        const sortedSchedules = Object.keys(
+                          servicesBySchedule
+                        ).sort((a, b) => {
+                          if (a === "Sin horario especificado") return 1;
+                          if (b === "Sin horario especificado") return -1;
+                          return a.localeCompare(b);
                         });
 
-                      const sortedSchedules = Object.keys(
-                        servicesBySchedule
-                      ).sort((a, b) => {
-                        if (a === "Sin horario especificado") return 1;
-                        if (b === "Sin horario especificado") return -1;
-                        return a.localeCompare(b);
-                      });
+                        return sortedSchedules.map((scheduleKey) => (
+                          <div key={scheduleKey} className="space-y-2">
+                            {/* Header del grupo con scheduleDescription */}
+                            <h4 className="font-semibold text-sm flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              {scheduleKey}
+                            </h4>
 
-                      return sortedSchedules.map((scheduleKey) => (
-                        <div key={scheduleKey} className="space-y-2">
-                          {/* Header del grupo con scheduleDescription */}
-                          <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            {scheduleKey}
-                          </h4>
+                            {/* Lista de servicios (una columna) */}
+                            <div className="space-y-2 ml-6">
+                              {servicesBySchedule[scheduleKey].map(
+                                (item: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="p-3 rounded-lg bg-muted space-y-2"
+                                  >
+                                    {/* Header del servicio con nombre y cantidad */}
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <p className="font-medium text-sm">
+                                            {item.serviceName ||
+                                              "Servicio sin nombre"}
+                                          </p>
+                                          {item.quantity && (
+                                            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
+                                              ×{item.quantity}
+                                            </span>
+                                          )}
+                                        </div>
 
-                          {/* Lista de servicios (una columna) */}
-                          <div className="space-y-2 ml-6">
-                            {servicesBySchedule[scheduleKey].map(
-                              (item: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="p-3 rounded-lg bg-muted space-y-2"
-                                >
-                                  {/* Header del servicio con nombre y cantidad */}
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="font-medium text-sm">
-                                          {item.serviceName ||
-                                            "Servicio sin nombre"}
-                                        </p>
-                                        {item.quantity && (
-                                          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
-                                            ×{item.quantity}
+                                        {/* Información del servicio en líneas separadas */}
+                                        {item.serviceNameAlternative && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            {item.serviceNameAlternative}
+                                          </p>
+                                        )}
+                                        {item.serviceCode && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Código: {item.serviceCode}
+                                          </p>
+                                        )}
+
+                                        {/* Fecha de la actividad */}
+                                        {item.activity?.activityDate && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            📅 Fecha Actividad:{" "}
+                                            {formatDateLocal(
+                                              item.activity.activityDate,
+                                              "es-ES",
+                                              {
+                                                year: "numeric",
+                                                month: "long",
+                                                day: "numeric",
+                                              }
+                                            )}
+                                          </p>
+                                        )}
+
+                                        {/* Tipo de actividad */}
+                                        {item.activity?.activityType
+                                          ?.activityTypeName && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Actividad:{" "}
+                                            {
+                                              item.activity.activityType
+                                                .activityTypeName
+                                            }
+                                          </p>
+                                        )}
+
+                                        {/* Horario del schedule */}
+                                        {item.schedule?.startDate && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            📅{" "}
+                                            {formatDateLocal(
+                                              item.schedule.startDate
+                                            )}
+                                            {item.schedule.startTime &&
+                                              item.schedule.endTime && (
+                                                <span>
+                                                  {" "}
+                                                  • {
+                                                    item.schedule.startTime
+                                                  } - {item.schedule.endTime}
+                                                </span>
+                                              )}
+                                          </p>
+                                        )}
+
+                                        {/* Precios del servicio */}
+                                        {(item.priceTI !== undefined ||
+                                          item.priceTNI !== undefined) && (
+                                          <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                                            {item.priceTI !== undefined && (
+                                              <p className="text-xs text-muted-foreground">
+                                                Precio TI (Con Impuestos): $
+                                                {item.priceTI.toFixed(2)}
+                                              </p>
+                                            )}
+                                            {item.priceTNI !== undefined && (
+                                              <p className="text-xs font-medium text-green-600 dark:text-green-400">
+                                                Precio TNI (Sin Impuestos): $
+                                                {item.priceTNI.toFixed(2)}
+                                              </p>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-right text-xs text-muted-foreground">
+                                        {item.creationDate && (
+                                          <p>
+                                            Creado:{" "}
+                                            {formatDateLocal(
+                                              item.creationDate,
+                                              "es-ES",
+                                              {
+                                                day: "2-digit",
+                                                month: "2-digit",
+                                                year: "numeric",
+                                              }
+                                            )}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Categoría y subcategoría */}
+                                    {item.serviceCategory && (
+                                      <div className="text-xs">
+                                        <span className="text-muted-foreground">
+                                          Categoría:{" "}
+                                        </span>
+                                        <span className="font-medium">
+                                          {
+                                            item.serviceCategory
+                                              .serviceCategoryName
+                                          }
+                                        </span>
+                                        {item.serviceSubCategory && (
+                                          <span className="text-muted-foreground">
+                                            {" / "}
+                                            {
+                                              item.serviceSubCategory
+                                                .serviceSubCategoryName
+                                            }
                                           </span>
                                         )}
                                       </div>
+                                    )}
 
-                                      {/* Información del servicio en líneas separadas */}
-                                      {item.serviceNameAlternative && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          {item.serviceNameAlternative}
-                                        </p>
-                                      )}
-                                      {item.serviceCode && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          Código: {item.serviceCode}
-                                        </p>
-                                      )}
-
-                                      {/* Fecha de la actividad */}
-                                      {item.activity?.activityDate && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          📅 Fecha Actividad:{" "}
-                                          {formatDateLocal(
-                                            item.activity.activityDate,
-                                            "es-ES",
-                                            {
-                                              year: "numeric",
-                                              month: "long",
-                                              day: "numeric",
-                                            }
-                                          )}
-                                        </p>
-                                      )}
-
-                                      {/* Tipo de actividad */}
-                                      {item.activity?.activityType
-                                        ?.activityTypeName && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          Actividad:{" "}
-                                          {
-                                            item.activity.activityType
-                                              .activityTypeName
-                                          }
-                                        </p>
-                                      )}
-
-                                      {/* Horario del schedule */}
-                                      {item.schedule?.startDate && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          📅{" "}
-                                          {formatDateLocal(
-                                            item.schedule.startDate
-                                          )}
-                                          {item.schedule.startTime &&
-                                            item.schedule.endTime && (
-                                              <span>
-                                                {" "}
-                                                • {
-                                                  item.schedule.startTime
-                                                } - {item.schedule.endTime}
-                                              </span>
-                                            )}
-                                        </p>
-                                      )}
-
-                                      {/* Precios del servicio */}
-                                      {(item.priceTI !== undefined ||
-                                        item.priceTNI !== undefined) && (
-                                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                                          {item.priceTI !== undefined && (
-                                            <p className="text-xs text-muted-foreground">
-                                              Precio TI (Con Impuestos): $
-                                              {item.priceTI.toFixed(2)}
-                                            </p>
-                                          )}
-                                          {item.priceTNI !== undefined && (
-                                            <p className="text-xs font-medium text-green-600 dark:text-green-400">
-                                              Precio TNI (Sin Impuestos): $
-                                              {item.priceTNI.toFixed(2)}
-                                            </p>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="text-right text-xs text-muted-foreground">
-                                      {item.creationDate && (
-                                        <p>
-                                          Creado:{" "}
-                                          {formatDateLocal(
-                                            item.creationDate,
-                                            "es-ES",
-                                            {
-                                              day: "2-digit",
-                                              month: "2-digit",
-                                              year: "numeric",
-                                            }
-                                          )}
-                                        </p>
-                                      )}
-                                    </div>
+                                    {/* Comentarios */}
+                                    {item.serviceComments && (
+                                      <p className="text-xs text-muted-foreground pt-2 border-t">
+                                        {item.serviceComments}
+                                      </p>
+                                    )}
                                   </div>
-
-                                  {/* Categoría y subcategoría */}
-                                  {item.serviceCategory && (
-                                    <div className="text-xs">
-                                      <span className="text-muted-foreground">
-                                        Categoría:{" "}
-                                      </span>
-                                      <span className="font-medium">
-                                        {
-                                          item.serviceCategory
-                                            .serviceCategoryName
-                                        }
-                                      </span>
-                                      {item.serviceSubCategory && (
-                                        <span className="text-muted-foreground">
-                                          {" / "}
-                                          {
-                                            item.serviceSubCategory
-                                              .serviceSubCategoryName
-                                          }
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {/* Comentarios */}
-                                  {item.serviceComments && (
-                                    <p className="text-xs text-muted-foreground pt-2 border-t">
-                                      {item.serviceComments}
-                                    </p>
-                                  )}
-                                </div>
-                              )
-                            )}
+                                )
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </CardContent>
+                        ));
+                      })()}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
 

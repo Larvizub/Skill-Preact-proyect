@@ -21,9 +21,12 @@ export function Card({ children, className, onClick }: CardProps) {
   );
 }
 
-export function CardHeader({ children, className }: CardProps) {
+export function CardHeader({ children, className, onClick }: CardProps) {
   return (
-    <div className={cn("flex flex-col space-y-1.5 p-6", className)}>
+    <div
+      className={cn("flex flex-col space-y-1.5 p-6", className)}
+      onClick={onClick}
+    >
       {children}
     </div>
   );
