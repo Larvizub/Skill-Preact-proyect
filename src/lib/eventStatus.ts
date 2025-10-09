@@ -26,6 +26,7 @@ export const STATUS_DEFINITION_MAP = STATUS_DEFINITIONS.reduce(
   {} as Record<StatusCategory, (typeof STATUS_DEFINITIONS)[number]>
 );
 
+// Filtros por defecto (todos activos excepto "cancelado")
 export const DEFAULT_STATUS_FILTERS: Record<StatusCategory, boolean> = {
   confirmado: true,
   porConfirmar: true,
