@@ -112,11 +112,11 @@ Disponibilidad de salones del 2025-10-15 al 2025-10-20:
 
 ## Validaciones
 
-- ✅ Fecha de inicio requerida
-- ✅ Fecha de fin requerida
-- ✅ Fecha inicio <= Fecha fin
-- ✅ Solo salones activos en resultados
-- ✅ Verificación de solapamiento precisa
+- Fecha de inicio requerida
+- Fecha de fin requerida
+- Fecha inicio <= Fecha fin
+- Solo salones activos en resultados
+- Verificación de solapamiento precisa
 
 ## Notas Técnicas
 

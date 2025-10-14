@@ -1,49 +1,46 @@
-# Skill Platform - Plataforma de Gestión de Eventos
+# Skill Platform - Plataforma de Gestión de Eventos (Estado actual)
 
-Plataforma web desarrollada con **Vite + Preact + TypeScript** para la gestión y consulta de eventos, integrando con la API de Skill Suite.
+Plataforma web desarrollada con Vite + Preact + TypeScript para la gestión y consulta de eventos, integrada con la API de Skill Suite. A continuación se describe el estado real del proyecto, módulos implementados y puntos pendientes.
 
-## 🚀 Tecnologías
+## 🚀 Tecnologías principales
 
-- **Preact** - Framework ligero de UI
-- **TypeScript** - Tipado estático
-- **Vite** - Build tool y dev server
-- **Tailwind CSS** - Framework de estilos utility-first
-- **Shadcn UI** - Componentes UI personalizados
-- **Lucide Preact** - Iconos
-- **Preact Router** - Enrutamiento
-- **date-fns** - Manipulación de fechas
+- Preact + TypeScript
+- Vite
+- Tailwind CSS + Shadcn UI
+- pnpm (gestor de paquetes obligatorio)
+- date-fns
+- Lucide Preact (iconos)
+- preact-router
 
-## 📋 Características
+## ✅ Estado actual - Módulos implementados
 
-### Módulos Implementados
+Las siguientes páginas/funcionalidades están implementadas bajo `src/pages` y en uso:
 
-La lista a continuación refleja los módulos actuales en `src/pages` del proyecto y una breve descripción de cada uno.
+- Login (`Login.tsx`) — Autenticación basada en token, flujo de login/logout y protección de rutas.
+- Dashboard (`Dashboard.tsx`) — KPIs, tarjetas y métricas principales.
+- Eventos (`Eventos.tsx`) — Búsqueda, filtrado y listado de eventos.
+- Evento Detalle (`EventoDetalle.tsx`) — Información completa del evento: actividades, servicios, tarifas, cotizaciones y facturas.
+- Calendario (`Calendario.tsx`) — Vista mensual con filtros por estatus/segmento y navegación por fecha.
+- Salones (`Salones.tsx`) — Catálogo y detalles de salones.
+- Salones Disponibles (`SalonesDisponibles.tsx`) — Consulta de disponibilidad por rango de fechas.
+- Inventario (`Inventario.tsx`) — Listado de artículos y servicios para cotizaciones.
+- Coordinadores (`Coordinadores.tsx`) — Agentes de ventas / coordinadores de cuenta.
+- Clientes (`Clientes.tsx`) — Gestión básica de clientes (funcionalidad parcial).
+- Contactos (`Contactos.tsx`) — Gestión básica de contactos (funcionalidad parcial).
+- Personal Eventos (`PersonalEventos.tsx`) — Revisar asignaciones y costos (básico).
+- Parqueos Eventos (`ParqueosEventos.tsx`) — Desglose por actividades de parqueo.
+- ApiTest (`ApiTest.tsx`) — Página para pruebas y debug de llamadas al API.
 
-1. **Login** (`Login.tsx`) - Página de autenticación y flujo de inicio de sesión.
-2. **Dashboard** (`Dashboard.tsx`) - Vista general con KPIs, tendencias y tarjetas de resumen.
-3. **Eventos** (`Eventos.tsx`) - Búsqueda y listado de eventos con filtros y accesos a detalle.
-4. **Evento Detalle** (`EventoDetalle.tsx`) - Vista detallada de un evento con actividades, servicios y facturas.
-5. **Calendario** (`Calendario.tsx`) - Vista mensual tipo calendario con conteo y filtros por estatus/segmento.
-6. **Salones** (`Salones.tsx`) - Gestión y visualización de salones y sus características.
-7. **Salones Disponibles** (`SalonesDisponibles.tsx`) - Búsqueda de disponibilidad de salones por rango de fechas.
-8. **Personal Eventos** (`PersonalEventos.tsx`) - Módulo para revisar asignaciones y costos de personal por actividad.
-9. **Parqueos Eventos** (`ParqueosEventos.tsx`) - Desglose por actividades de parqueos y servicios relacionados.
-10. **Inventario** (`Inventario.tsx`) - Catálogo de artículos y servicios disponibles para cotización.
-11. **Coordinadores** (`Coordinadores.tsx`) - Lista y gestión de coordinadores de cuenta / agentes de ventas.
-12. **Clientes** (`Clientes.tsx`) - Gestión básica de clientes y contactos asociados.
-13. **Contactos** (`Contactos.tsx`) - Gestión de contactos relacionados con clientes y eventos.
-14. **ApiTest** (`ApiTest.tsx`) - Página para pruebas rápidas y debug de llamadas al API.
+Si detectas módulos nuevos en `src/pages` que no están listados aquí, indícalo y lo actualizo.
 
-Si falta algún módulo (por ejemplo importaciones nuevas en `src/pages`), házmelo saber y lo añado aquí.
+## ✨ UI/UX en producción
 
-### Características UI/UX
+- Diseño responsivo (móvil y escritorio)
+- Tema oscuro/claro automático según preferencia del sistema
+- Barra lateral de navegación con acceso a los módulos principales
+- Componentes reutilizables basados en Shadcn UI
 
-- ✅ Diseño responsivo (móvil y escritorio)
-- ✅ Tema oscuro/claro automático
-- ✅ Navegación lateral intuitiva
-- ✅ Componentes reutilizables basados en Shadcn UI
-
-## 🔧 Instalación
+## 🔧 Instalación y uso local
 
 ```bash
 # Instalar dependencias
@@ -59,109 +56,65 @@ pnpm build
 pnpm preview
 ```
 
-## 🌐 API de Conexión
-
-La plataforma se conecta al API de Skill Suite:
-
-- **URL Base**: `https://grupoheroicaapi.skillsuite.net/app/wssuite/api`
-- **Autenticación**: Token-based authentication
-
-### Endpoints Integrados
-
-- Autenticación
-- Salones y tarifas
-- Servicios y tarifas
-- Disponibilidad de salones
-- Tipos de eventos
-- Segmentos de mercado
-- Coordinadores de cuenta
-- Estados y características de eventos
-- Calendarios y eventos
-- Cotizaciones y facturas
-
-## 📁 Estructura del Proyecto
-
-```
-src/
-├── components/
-│   ├── layout/          # Layout y navegación
-│   │   ├── Layout.tsx
-│   │   └── Sidebar.tsx
-│   └── ui/              # Componentes UI reutilizables
-│       ├── button.tsx
-│       ├── card.tsx
-│       └── input.tsx
-├── contexts/            # Context providers
-│   └── ThemeContext.tsx
-├── lib/                 # Utilidades
-│   └── utils.ts
-├── pages/              # Páginas de la aplicación
-│   ├── Login.tsx
-│   ├── Dashboard.tsx
-│   ├── Eventos.tsx
-│   ├── Calendario.tsx
-│   ├── Salones.tsx
-│   ├── Inventario.tsx
-│   ├── Clientes.tsx
-│   ├── Contactos.tsx
-│   └── Coordinadores.tsx
-├── services/           # Servicios de API
-│   ├── auth.service.ts
-│   └── api.service.ts
-├── app.css            # Estilos globales con Tailwind
-└── main.tsx          # Punto de entrada
-```
-
-## 🎨 Diseño
-
-La plataforma utiliza un sistema de diseño basado en variables CSS para soportar temas:
-
-- Paleta de colores adaptable
-- Componentes consistentes
-- Espaciado y tipografía coherente
-- Modo oscuro/claro
-
-## 🔐 Autenticación
-
-El sistema de autenticación utiliza:
-
-- Token JWT almacenado en localStorage
-- Redirección automática a login si no está autenticado
-- Servicio centralizado de autenticación
-
-## 📦 Gestión de Paquetes
-
-Este proyecto utiliza **pnpm** como gestor de paquetes. Asegúrate de tener pnpm instalado:
+Asegúrate de tener pnpm instalado globalmente:
 
 ```bash
 npm install -g pnpm
 ```
 
-## 🚧 Desarrollo Futuro
+## 🌐 Integración con API (estado)
 
-- [ ] Implementar módulo de Clientes
-- [ ] Implementar módulo de Contactos
-- [ ] Agregar funcionalidad de búsqueda avanzada
-- [ ] Implementar filtros en todas las vistas
-- [ ] Agregar exportación de reportes
-- [ ] Implementar notificaciones en tiempo real
+Base: `https://grupoheroicaapi.skillsuite.net/app/wssuite/api`  
+Se utiliza autenticación token-based (JWT). El token se guarda en localStorage y se incluye en las llamadas mediante el servicio de API (interceptor).
 
-## 📝 Notas
+Endpoints actualmente consumidos en producción / desarrollo:
 
-- La plataforma está configurada para modo de desarrollo
-- Los errores de lint de TypeScript con `preact-router` son esperados y no afectan la funcionalidad
-- El tema se detecta automáticamente según las preferencias del sistema operativo
+- Autenticación (token)
+- GetRooms, GetRoomRates, GetRoomsAvailability
+- GetServices, GetServiceRates
+- GetEvents, GetEventQuote, GetEventInvoices
+- GetSalesAgents (coordinadores)
+- GetEventStatuses, GetEventTypes, GetEventMarketSegments
+- GetSchedules, GetEventCoordinators
 
-## 👨‍💻 Desarrollo
+Otros endpoints disponibles en la API (implementados parcialmente o en pruebas): EventCharacters, EventSectors, EventSizes, ReservationTypes/Uses, EventStages, ActivityTypes.
 
-Para contribuir al proyecto:
+Nota: Las llamadas al API están centralizadas en `src/services` (ej. `api.service.ts`, `auth.service.ts`) con manejo de errores y reintentos básicos en desarrollo.
 
-1. Crea una rama nueva
-2. Realiza tus cambios
-3. Asegúrate de que el código compile sin errores críticos
-4. Prueba en ambos temas (oscuro y claro)
-5. Verifica la responsividad en diferentes dispositivos
+## 📁 Estructura relevante del proyecto (simplificada)
+
+src/
+
+- components/ (layout, ui)
+- contexts/ (Theme, Auth)
+- pages/ (Login, Dashboard, Eventos, EventoDetalle, Calendario, Salones, SalonesDisponibles, Inventario, Coordinadores, Clientes, Contactos, PersonalEventos, ParqueosEventos, ApiTest)
+- services/ (auth.service.ts, api.service.ts, rooms.service.ts, events.service.ts, quotes.service.ts, invoices.service.ts)
+- lib/ (utils)
+- main.tsx, app.css
+
+## 🔐 Autenticación y seguridad
+
+- Token JWT en localStorage (actualmente).
+- Interceptor para adjuntar Authorization header en peticiones.
+- Redirección automática al login si token inválido o expirado.
+  (Se recomienda migrar a cookies seguras/refresh tokens en próximos sprints).
+
+## 🚧 Pendientes y roadmap corto
+
+- Completar CRUD avanzado para Clientes y Contactos.
+- Mejorar manejo de sesiones (refresh token / cookies seguras).
+- Exportación de reportes (PDF/CSV).
+- Implementar notificaciones en tiempo real (WebSocket/SignalR).
+- Tests e2e y CI/CD básico.
+- Optimización de carga y mejoras de accesibilidad.
+
+## 👨‍💻 Contribución rápida
+
+1. Crear una rama nueva desde main
+2. Ejecutar pnpm install y pnpm dev
+3. Seguir las convenciones de código (Prettier, ESLint)
+4. Probar en modo claro/oscuro y en móvil
 
 ---
 
-Desarrollado con Preact + TypeScript + Tailwind CSS
+Desarrollado con Preact + TypeScript + Tailwind CSS. Si necesitas que actualice detalles concretos (por ejemplo: endpoints implementados, páginas nuevas o flujo de autenticación), indícame el punto y lo reflejo en el README.
