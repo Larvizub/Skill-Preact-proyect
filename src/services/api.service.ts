@@ -28,11 +28,11 @@ async function apiRequest<T>(
       // Token inválido/expirado: limpiar sesión y navegar usando el router SPA.
       authService.logout();
       try {
-        // Use preact-router's route to avoid full page reload and ensure the
-        // Login component mounted at /login is used.
+        // Usar route de preact-router para evitar recarga completa de la página
+        // y asegurar que el componente Login montado en /login sea utilizado.
         route("/login", true);
       } catch (e) {
-        // Fallback a window.location si por alguna razón route falla
+        // Alternativa: usar window.location si por alguna razón route falla
         console.warn(
           "preact-router route() falló, usando window.location as fallback",
           e
@@ -392,7 +392,7 @@ export const apiService = {
           }),
         })
     ).then(async (payload) => {
-      // Normalize payload to Service[] and map alternate price field names
+      // Normalizar el payload a Service[] y mapear nombres alternativos de campos de precio
       let raw: any[] = [];
       if (Array.isArray(payload)) raw = payload as any[];
       else if (Array.isArray((payload as any)?.services))
@@ -443,12 +443,12 @@ export const apiService = {
         const priceTI = pickFirstNumber(s, withTaxKeys);
         const priceTNI = pickFirstNumber(s, withoutTaxKeys);
 
-        // If API only provides a single price, try to guess:
-        // assume `price` or `unitPrice` is without tax if no explicit withTax found
+        // Si la API solo provee un precio, intentar deducir:
+        // asumir `price` o `unitPrice` como sin impuesto si no hay campo explícito con impuesto
         let finalPriceTI = s.priceTI ?? priceTI;
         let finalPriceTNI = s.priceTNI ?? priceTNI;
         if (finalPriceTNI === undefined && finalPriceTI !== undefined) {
-          // can't reliably compute tax -> keep only one field (TI)
+          // no se puede calcular el impuesto de forma fiable -> conservar solo un campo (TI)
           finalPriceTNI = undefined;
         }
         if (finalPriceTI === undefined && finalPriceTNI !== undefined) {
@@ -496,7 +496,7 @@ export const apiService = {
             ? [r.priceList]
             : [];
           if (lists.length > 0) {
-            // prefer active list that covers today
+            // preferir la lista activa que cubra la fecha actual
             chosenPriceList = lists.find(
               (p: any) =>
                 p.priceListActive === true &&
@@ -506,7 +506,7 @@ export const apiService = {
                     p.priceListToDate >= todayStr))
             );
             if (!chosenPriceList) {
-              // fallback to any active
+              // en su defecto usar cualquier lista activa
               chosenPriceList =
                 lists.find((p: any) => p.priceListActive === true) || lists[0];
             }
