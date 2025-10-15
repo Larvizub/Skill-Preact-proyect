@@ -2,7 +2,7 @@
 
 Plataforma web desarrollada con Vite + Preact + TypeScript para la gestión y consulta de eventos, integrada con la API de Skill Suite. A continuación se describe el estado real del proyecto, módulos implementados y puntos pendientes.
 
-## 🚀 Tecnologías principales
+## Tecnologías principales
 
 - Preact + TypeScript
 - Vite
@@ -12,7 +12,7 @@ Plataforma web desarrollada con Vite + Preact + TypeScript para la gestión y co
 - Lucide Preact (iconos)
 - preact-router
 
-## ✅ Estado actual - Módulos implementados
+## Módulos implementados
 
 Las siguientes páginas/funcionalidades están implementadas bajo `src/pages` y en uso:
 
@@ -33,7 +33,7 @@ Las siguientes páginas/funcionalidades están implementadas bajo `src/pages` y 
 
 Si detectas módulos nuevos en `src/pages` que no están listados aquí, indícalo y lo actualizo.
 
-## ✨ UI/UX en producción
+## UI/UX en producción
 
 - Diseño responsivo (móvil y escritorio)
 - Tema oscuro/claro automático según preferencia del sistema
@@ -81,7 +81,7 @@ Otros endpoints disponibles en la API (implementados parcialmente o en pruebas):
 
 Nota: Las llamadas al API están centralizadas en `src/services` (ej. `api.service.ts`, `auth.service.ts`) con manejo de errores y reintentos básicos en desarrollo.
 
-## 📁 Estructura relevante del proyecto (simplificada)
+## Estructura relevante del proyecto (simplificada)
 
 src/
 
@@ -92,14 +92,14 @@ src/
 - lib/ (utils)
 - main.tsx, app.css
 
-## 🔐 Autenticación y seguridad
+## Autenticación y seguridad
 
 - Token JWT en localStorage (actualmente).
 - Interceptor para adjuntar Authorization header en peticiones.
 - Redirección automática al login si token inválido o expirado.
   (Se recomienda migrar a cookies seguras/refresh tokens en próximos sprints).
 
-## 🚧 Pendientes y roadmap corto
+## Pendientes y roadmap corto
 
 - Completar CRUD avanzado para Clientes y Contactos.
 - Mejorar manejo de sesiones (refresh token / cookies seguras).
@@ -108,7 +108,7 @@ src/
 - Tests e2e y CI/CD básico.
 - Optimización de carga y mejoras de accesibilidad.
 
-## 👨‍💻 Contribución rápida
+## Contribución rápida
 
 1. Crear una rama nueva desde main
 2. Ejecutar pnpm install y pnpm dev
