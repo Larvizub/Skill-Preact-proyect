@@ -1376,6 +1376,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   quoteData?.Totals,
                   quoteData?.summary,
                   quoteData?.pricing,
+                  quoteData?.header,
+                  quoteData?.financial,
+                  quoteData?.financialSummary,
+                  quoteData?.eventTotals,
                   rawEvent?.totals,
                   rawEvent?.Totals,
                   rawEvent?.eventTotals,
@@ -1431,6 +1435,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     "discount",
                     "discountValue",
                     "eventDiscountAmount",
+                    "discountPercentage",
+                    "discountPercent",
+                    "descuento",
+                    "dscto",
                   ])
                 );
                 const taxesAmount = ensurePositive(
@@ -1443,6 +1451,14 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     "taxes",
                     "taxValue",
                     "eventTaxes",
+                    "tax",
+                    "iva",
+                    "ivaAmount",
+                    "totalIva",
+                    "totalVat",
+                    "vat",
+                    "vatAmount",
+                    "vatValue",
                   ])
                 );
                 const providedGrandTotalValue = pickAmount([
@@ -1452,6 +1468,8 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   "totalWithTax",
                   "eventAmount",
                   "totalQuotation",
+                  "total",
+                  "totalQuote",
                 ]);
 
                 const computedGrandTotal =
