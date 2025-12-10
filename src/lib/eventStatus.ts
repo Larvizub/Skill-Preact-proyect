@@ -430,28 +430,15 @@ export const buildSegmentOption = (label: string): SegmentOption => ({
 export const isItemCancelled = (item: any): boolean => {
   if (!item) return false;
 
-  // Helper to safely get string value
-  const getString = (val: any) => (typeof val === "string" ? val : "");
+  // 1. Check boolean flags
+  if (item.isCancelled === true || item.cancelled === true) return true;
 
-  const statusCandidates = [
-    getString(item.eventStatusDescription),
-    getString(item.eventStatus?.eventStatusDescription),
-    getString(item.eventStatus?.eventStatusName),
-    getString(item.eventStatus?.name),
-    getString(item.eventStatusName),
-    getString(item.statusDescription),
-    getString(item.statusName),
-    getString(item.status),
-    getString(item.eventStatus), // In case it's a string
-    getString(item.state),
-    getString(item.roomStatus),
-    getString(item.serviceStatus),
-    getString(item.roomStatusName),
-    getString(item.serviceStatusName),
-  ];
-
-  return statusCandidates.some((s) => {
-    const lower = s
+  // 2. Check specific known fields (string or object with name/desc)
+  const checkString = (s: any) => {
+    if (!s) return false;
+    const str = typeof s === "string" ? s : s.name || s.description || "";
+    if (typeof str !== "string") return false;
+    const lower = str
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
@@ -460,5 +447,33 @@ export const isItemCancelled = (item: any): boolean => {
       lower.includes("cancelled") ||
       lower.includes("anulado")
     );
-  });
+  };
+
+  const explicitCandidates = [
+    item.eventStatusDescription,
+    item.eventStatus,
+    item.eventStatusName,
+    item.statusDescription,
+    item.statusName,
+    item.status,
+    item.state,
+    item.roomStatus,
+    item.serviceStatus,
+    item.roomStatusName,
+    item.serviceStatusName,
+  ];
+
+  if (explicitCandidates.some(checkString)) return true;
+
+  // 3. Dynamic check for any property looking like a status
+  for (const key in item) {
+    if (
+      key.toLowerCase().includes("status") ||
+      key.toLowerCase().includes("state")
+    ) {
+      if (checkString(item[key])) return true;
+    }
+  }
+
+  return false;
 };

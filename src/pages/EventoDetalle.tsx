@@ -806,8 +806,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                               </div>
                             )}
                           </div>
-                        )
-                      )}
+                        ))}
                     </div>
                   </CardContent>
                 )}
@@ -854,28 +853,28 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                               .filter((room: any) => !isItemCancelled(room))
                               .forEach((room: any) => {
                                 // Intentar obtener scheduleDescription de la actividad o del room
-                              const scheduleKey =
-                                activity.scheduleDescription ||
-                                room.schedule?.scheduleDescription ||
-                                (activity.activityDate
-                                  ? formatDateLocal(
-                                      activity.activityDate,
-                                      "es-ES",
-                                      {
-                                        year: "numeric",
-                                        month: "long",
-                                        day: "numeric",
-                                      }
-                                    )
-                                  : "Sin horario especificado");
+                                const scheduleKey =
+                                  activity.scheduleDescription ||
+                                  room.schedule?.scheduleDescription ||
+                                  (activity.activityDate
+                                    ? formatDateLocal(
+                                        activity.activityDate,
+                                        "es-ES",
+                                        {
+                                          year: "numeric",
+                                          month: "long",
+                                          day: "numeric",
+                                        }
+                                      )
+                                    : "Sin horario especificado");
 
-                              if (!roomsBySchedule[scheduleKey])
-                                roomsBySchedule[scheduleKey] = [];
-                              roomsBySchedule[scheduleKey].push({
-                                ...room,
-                                activity,
+                                if (!roomsBySchedule[scheduleKey])
+                                  roomsBySchedule[scheduleKey] = [];
+                                roomsBySchedule[scheduleKey].push({
+                                  ...room,
+                                  activity,
+                                });
                               });
-                            });
                           });
 
                         const sortedSchedules = Object.keys(
@@ -1027,19 +1026,21 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                           )
                           .forEach((activity: any) => {
                             activity.services
-                              .filter((service: any) => !isItemCancelled(service))
+                              .filter(
+                                (service: any) => !isItemCancelled(service)
+                              )
                               .forEach((service: any) => {
                                 // Usar schedule.scheduleDescription del servicio
-                              const scheduleKey =
-                                service.schedule?.scheduleDescription ||
-                                "Sin horario especificado";
-                              if (!servicesBySchedule[scheduleKey])
-                                servicesBySchedule[scheduleKey] = [];
-                              servicesBySchedule[scheduleKey].push({
-                                ...service,
-                                activity, // Incluir la actividad completa para acceder a su fecha
+                                const scheduleKey =
+                                  service.schedule?.scheduleDescription ||
+                                  "Sin horario especificado";
+                                if (!servicesBySchedule[scheduleKey])
+                                  servicesBySchedule[scheduleKey] = [];
+                                servicesBySchedule[scheduleKey].push({
+                                  ...service,
+                                  activity, // Incluir la actividad completa para acceder a su fecha
+                                });
                               });
-                            });
                           });
 
                         const sortedSchedules = Object.keys(
