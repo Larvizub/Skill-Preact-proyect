@@ -1,4 +1,3 @@
-
 export interface QuoteItem {
   net: number;
   discount: number;
@@ -14,9 +13,12 @@ export interface QuoteTotals {
   grandTotal: number;
 }
 
-export function calculateItemAmounts(item: any, quantity: number = 1): QuoteItem {
+export function calculateItemAmounts(
+  item: any,
+  quantity: number = 1
+): QuoteItem {
   const price = item.priceTNI || item.priceTI || 0;
-  const net = item.netAmount || (price * quantity);
+  const net = item.netAmount || price * quantity;
   // Handle API typo 'groosAmount'
   const gross = item.grossAmount || item.groosAmount || net;
   const discountPct = item.discountPercentage || 0;
@@ -46,7 +48,7 @@ export function calculateItemAmounts(item: any, quantity: number = 1): QuoteItem
     discount,
     tax,
     price,
-    total: taxableAmount + tax
+    total: taxableAmount + tax,
   };
 }
 
@@ -73,7 +75,10 @@ export function calculateEventQuoteTotals(event: any): QuoteTotals {
       if (activity.services && Array.isArray(activity.services)) {
         activity.services.forEach((service: any) => {
           const quantity = service.quantity || service.serviceQuantity || 1;
-          const { net, discount, tax } = calculateItemAmounts(service, quantity);
+          const { net, discount, tax } = calculateItemAmounts(
+            service,
+            quantity
+          );
           if (net > 0 || service.priceTNI > 0 || service.priceTI > 0) {
             totalNet += net;
             totalDiscount += discount;
@@ -88,6 +93,6 @@ export function calculateEventQuoteTotals(event: any): QuoteTotals {
     totalNet,
     totalDiscount,
     totalTax,
-    grandTotal: totalNet - totalDiscount + totalTax
+    grandTotal: totalNet - totalDiscount + totalTax,
   };
 }
