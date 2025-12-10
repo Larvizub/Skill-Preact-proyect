@@ -1327,7 +1327,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                             cantidad: 1,
                             descuento: discount,
                           });
-                          totalSalones.total += (net - discount);
+                          totalSalones.total += net - discount;
                           totalGeneral += net;
                           totalDescuentoCalculado += discount;
                           totalImpuestosCalculado += tax;
@@ -1392,7 +1392,8 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                             cantidad,
                             descuento: discount,
                           });
-                          serviciosPorGrupo[grupoIngresos].total += (net - discount);
+                          serviciosPorGrupo[grupoIngresos].total +=
+                            net - discount;
                           totalGeneral += net;
                           totalDescuentoCalculado += discount;
                           totalImpuestosCalculado += tax;
