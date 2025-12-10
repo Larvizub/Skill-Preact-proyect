@@ -1274,8 +1274,24 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     const discountPct = item.discountPercentage || 0;
                     
                     const discount = net * (discountPct / 100);
-                    // Impuesto = Total Final - (Neto - Descuento)
-                    const tax = gross - (net - discount);
+                    
+                    // Calcular tasa de impuesto
+                    // 1. Intentar desde precios unitarios (más seguro)
+                    let taxRate = 0;
+                    const pTNI = item.priceTNI || 0;
+                    const pTI = item.priceTI || 0;
+                    
+                    if (pTNI > 0 && pTI > pTNI) {
+                        taxRate = (pTI - pTNI) / pTNI;
+                    } else if (net > 0 && gross > net) {
+                        // 2. Fallback: inferir de totales (gross vs net)
+                        // Nota: Esto asume que gross no tiene descuento aplicado si net no lo tiene
+                        taxRate = (gross - net) / net;
+                    }
+                    
+                    // El impuesto se calcula sobre el monto descontado (base imponible)
+                    const taxableAmount = Math.max(0, net - discount);
+                    const tax = taxableAmount * taxRate;
                     
                     return { net, discount, tax, price };
                 };
