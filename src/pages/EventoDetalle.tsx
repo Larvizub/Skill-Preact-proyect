@@ -1395,6 +1395,81 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   rawEvent?.eventSummary,
                 ];
 
+                // Fallbacks calculados a partir de los ítems (impuestos) y porcentajes (descuentos)
+                let fallbackTaxFromItems = 0;
+                let fallbackDiscountFromItems = 0;
+
+                const addTax = (value: number) => {
+                  if (Number.isFinite(value) && value > 0) fallbackTaxFromItems += value;
+                };
+
+                const addDiscount = (value: number) => {
+                  if (Number.isFinite(value) && value > 0) fallbackDiscountFromItems += value;
+                };
+
+                // Calcular impuestos/desc. desde rooms y services si hay montos netos/brutos o porcentaje
+                const safeQty = (q: unknown, defaultVal = 1) => {
+                  const n = Number(q);
+                  return Number.isFinite(n) && n > 0 ? n : defaultVal;
+                };
+
+                if ((event as any)?.activities) {
+                  (event as any).activities.forEach((activity: any) => {
+                    const activityDiscountPct = Number(activity?.discountPercentage);
+
+                    if (activity?.rooms && Array.isArray(activity.rooms)) {
+                      activity.rooms.forEach((room: any) => {
+                        const qty = 1;
+                        const priceNoTax = Number(room?.priceTNI) || 0;
+                        const priceWithTax = Number(room?.priceTI) || 0;
+
+                        // Impuesto implícito por diferencia TI - TNI o gross - net
+                        if (priceWithTax > priceNoTax) addTax((priceWithTax - priceNoTax) * qty);
+                        if (Number.isFinite(room?.groosAmount) && Number.isFinite(room?.netAmount)) {
+                          const gross = Number(room.groosAmount);
+                          const net = Number(room.netAmount);
+                          if (gross > net) addTax(gross - net);
+                        }
+
+                        // Descuento por porcentaje específico del room
+                        const roomDiscountPct = Number(room?.discountPercentage);
+                        if (roomDiscountPct > 0 && priceNoTax > 0) {
+                          addDiscount(priceNoTax * qty * (roomDiscountPct / 100));
+                        }
+
+                        // Descuento por porcentaje a nivel actividad
+                        if (activityDiscountPct > 0 && priceNoTax > 0) {
+                          addDiscount(priceNoTax * qty * (activityDiscountPct / 100));
+                        }
+                      });
+                    }
+
+                    if (activity?.services && Array.isArray(activity.services)) {
+                      activity.services.forEach((service: any) => {
+                        const qty = safeQty(service?.quantity || service?.serviceQuantity, 1);
+                        const priceNoTax = Number(service?.priceTNI) || 0;
+                        const priceWithTax = Number(service?.priceTI) || 0;
+
+                        if (priceWithTax > priceNoTax) addTax((priceWithTax - priceNoTax) * qty);
+                        if (Number.isFinite(service?.grossAmount) && Number.isFinite(service?.netAmount)) {
+                          const gross = Number(service.grossAmount);
+                          const net = Number(service.netAmount);
+                          if (gross > net) addTax(gross - net);
+                        }
+
+                        const serviceDiscountPct = Number(service?.discountPercentage);
+                        if (serviceDiscountPct > 0 && priceNoTax > 0) {
+                          addDiscount(priceNoTax * qty * (serviceDiscountPct / 100));
+                        }
+
+                        if (activityDiscountPct > 0 && priceNoTax > 0) {
+                          addDiscount(priceNoTax * qty * (activityDiscountPct / 100));
+                        }
+                      });
+                    }
+                  });
+                }
+
                 const parseNumericValue = (value: unknown): number | null => {
                   if (value === null || value === undefined) return null;
                   if (typeof value === "number") {
@@ -1469,51 +1544,74 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 };
 
                 const subtotal = totalGeneral;
-                const discountAmount = ensurePositive(
-                  pickAmount([
-                    "totalDiscount",
-                    "totalDiscountAmount",
-                    "discountAmount",
-                    "eventDiscount",
-                    "discount",
-                    "discountValue",
-                    "eventDiscountAmount",
-                    "discountPercentage",
-                    "discountPercent",
-                    "descuento",
-                    "dscto",
-                  ], /(discount|descuento|dscto|rebate|rebaja|bonif)/i)
+                const discountPctEvent = Number((event as any)?.discountPercentage);
+
+                const discountAmount = (() => {
+                  const fromPayload = pickAmount(
+                    [
+                      "totalDiscount",
+                      "totalDiscountAmount",
+                      "discountAmount",
+                      "eventDiscount",
+                      "discount",
+                      "discountValue",
+                      "eventDiscountAmount",
+                      "discountPercentage",
+                      "discountPercent",
+                      "descuento",
+                      "dscto",
+                    ],
+                    /(discount|descuento|dscto|rebate|rebaja|bonif)/i
+                  );
+
+                  if (fromPayload !== null) return ensurePositive(fromPayload);
+
+                  const fromPctEvent =
+                    discountPctEvent > 0 ? subtotal * (discountPctEvent / 100) : 0;
+
+                  return ensurePositive(fallbackDiscountFromItems + fromPctEvent);
+                })();
+
+                const taxesAmount = (() => {
+                  const fromPayload = pickAmount(
+                    [
+                      "totalTax",
+                      "totalTaxes",
+                      "totalTaxAmount",
+                      "taxAmount",
+                      "eventTax",
+                      "taxes",
+                      "taxValue",
+                      "eventTaxes",
+                      "tax",
+                      "iva",
+                      "ivaAmount",
+                      "totalIva",
+                      "totalVat",
+                      "vat",
+                      "vatAmount",
+                      "vatValue",
+                    ],
+                    /(tax|iva|vat)/i
+                  );
+
+                  if (fromPayload !== null) return ensurePositive(fromPayload);
+
+                  return ensurePositive(fallbackTaxFromItems);
+                })();
+                const providedGrandTotalValue = pickAmount(
+                  [
+                    "totalAmount",
+                    "grandTotal",
+                    "eventTotal",
+                    "totalWithTax",
+                    "eventAmount",
+                    "totalQuotation",
+                    "total",
+                    "totalQuote",
+                  ],
+                  /(total)/i
                 );
-                const taxesAmount = ensurePositive(
-                  pickAmount([
-                    "totalTax",
-                    "totalTaxes",
-                    "totalTaxAmount",
-                    "taxAmount",
-                    "eventTax",
-                    "taxes",
-                    "taxValue",
-                    "eventTaxes",
-                    "tax",
-                    "iva",
-                    "ivaAmount",
-                    "totalIva",
-                    "totalVat",
-                    "vat",
-                    "vatAmount",
-                    "vatValue",
-                  ], /(tax|iva|vat)/i)
-                );
-                const providedGrandTotalValue = pickAmount([
-                  "totalAmount",
-                  "grandTotal",
-                  "eventTotal",
-                  "totalWithTax",
-                  "eventAmount",
-                  "totalQuotation",
-                  "total",
-                  "totalQuote",
-                ], /(total)/i);
 
                 const computedGrandTotal =
                   subtotal - discountAmount + taxesAmount;
