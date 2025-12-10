@@ -626,31 +626,7 @@ export function Calendario() {
                                         <span className="truncate font-medium">
                                           {event.title}
                                         </span>
-                                        {/* small countdown badge for opcion1/2/3 */}
-                                        {(() => {
-                                          const ms = getCountdownMsForEvent(event);
-                                          if (ms === null) return null;
-                                          const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-                                          const cls =
-                                            ms > oneWeekMs
-                                              ? "bg-emerald-100 text-emerald-800"
-                                              : ms > 0
-                                              ? "bg-amber-100 text-amber-800"
-                                              : "bg-red-100 text-red-800";
-
-                                          return (
-                                            <span
-                                              className={`ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}
-                                              title={
-                                                ms <= 0
-                                                  ? `Venció hace ${formatCountdownShort(ms)}`
-                                                  : `Expira en ${formatCountdownShort(ms)}`
-                                              }
-                                            >
-                                              ⏳ {formatCountdownShort(ms)}
-                                            </span>
-                                          );
-                                        })()}
+                                        {/* no countdown in month grid */}
                                         {segmentContinuesAfter && (
                                           <span className="text-[8px]">…</span>
                                         )}
