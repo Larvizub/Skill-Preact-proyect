@@ -1327,7 +1327,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                             cantidad: 1,
                             descuento: discount,
                           });
-                          totalSalones.total += net;
+                          totalSalones.total += (net - discount);
                           totalGeneral += net;
                           totalDescuentoCalculado += discount;
                           totalImpuestosCalculado += tax;
@@ -1392,7 +1392,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                             cantidad,
                             descuento: discount,
                           });
-                          serviciosPorGrupo[grupoIngresos].total += net;
+                          serviciosPorGrupo[grupoIngresos].total += (net - discount);
                           totalGeneral += net;
                           totalDescuentoCalculado += discount;
                           totalImpuestosCalculado += tax;
@@ -1751,7 +1751,13 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                                     </div>
                                   </div>
                                   <div className="ml-4 text-right">
-                                    <p className={`font-medium ${item.descuento > 0 ? "text-muted-foreground line-through text-xs" : ""}`}>
+                                    <p
+                                      className={`font-medium ${
+                                        item.descuento > 0
+                                          ? "text-muted-foreground line-through text-xs"
+                                          : ""
+                                      }`}
+                                    >
                                       $
                                       {(
                                         item.precio * item.cantidad
@@ -1761,12 +1767,16 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                                       })}
                                     </p>
                                     {item.descuento > 0 && (
-                                        <p className="font-medium text-foreground">
-                                            $ {((item.precio * item.cantidad) - item.descuento).toLocaleString("es-ES", {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                            })}
-                                        </p>
+                                      <p className="font-medium text-foreground">
+                                        ${" "}
+                                        {(
+                                          item.precio * item.cantidad -
+                                          item.descuento
+                                        ).toLocaleString("es-ES", {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        })}
+                                      </p>
                                     )}
                                   </div>
                                 </div>
