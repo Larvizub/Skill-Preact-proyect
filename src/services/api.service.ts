@@ -987,10 +987,30 @@ export const apiService = {
   },
 
   // Cotización de eventos
-  // NOTA: Este endpoint no existe en la documentación oficial del API
-  // Se comenta para evitar errores 404
-  getEventQuote: (_eventId: string) =>
-    Promise.reject(new Error("Endpoint GetEventQuote no disponible en el API")),
+  // Intenta primero la ruta REST (prefijo /events) y luego la ruta legacy /GetEventQuote
+  getEventQuote: async (eventId: string) => {
+    return withFallback(
+      () =>
+        apiRequest<any>("/events/geteventquote", {
+          method: "POST",
+          body: JSON.stringify({
+            eventId,
+          }),
+        }),
+      () =>
+        apiRequest<any>("/GetEventQuote", {
+          method: "POST",
+          body: buildPayload({ eventId }),
+        })
+    ).then((payload) => {
+      // Normalizar payload: algunos endpoints envuelven en result o quote
+      if (!payload) return null;
+      if ((payload as any)?.result?.quote) return (payload as any).result.quote;
+      if ((payload as any)?.result) return (payload as any).result;
+      if ((payload as any)?.quote) return (payload as any).quote;
+      return payload;
+    });
+  },
 
   // Facturas
   getEventInvoices: (eventId: string) =>

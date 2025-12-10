@@ -45,6 +45,8 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
   const [salonesExpanded, setSalonesExpanded] = useState(false);
   const [serviciosExpanded, setServiciosExpanded] = useState(false);
   const [catalogServices, setCatalogServices] = useState<any[]>([]);
+  const [quoteData, setQuoteData] = useState<any | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   // Countdown state for quotes older than 1 month
   const [timeLeftMs, setTimeLeftMs] = useState<number | null>(null);
   const [countdownActive, setCountdownActive] = useState(false);
@@ -128,6 +130,28 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
       setDeadlineDate(null);
     };
   }, [event]);
+
+  // Cargar la cotización detallada (para descuentos/impuestos) cuando tengamos el evento
+  useEffect(() => {
+    const fetchQuote = async () => {
+      try {
+        if (!event) return;
+        const id =
+          (event as any)?.idEvent ?? (event as any)?.eventId ?? eventIdentifier;
+        if (!id) return;
+
+        setQuoteLoading(true);
+        const quote = await apiService.getEventQuote(String(id));
+        setQuoteData(quote);
+      } catch (error) {
+        console.error("Error cargando cotización del evento:", error);
+      } finally {
+        setQuoteLoading(false);
+      }
+    };
+
+    fetchQuote();
+  }, [event, eventIdentifier]);
 
   const loadCatalogServices = async () => {
     try {
@@ -1347,6 +1371,11 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
                 const amountSources = [
                   rawEvent,
+                  quoteData,
+                  quoteData?.totals,
+                  quoteData?.Totals,
+                  quoteData?.summary,
+                  quoteData?.pricing,
                   rawEvent?.totals,
                   rawEvent?.Totals,
                   rawEvent?.eventTotals,
@@ -1483,6 +1512,15 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                         <p className="text-2xl font-bold text-primary">
                           {finalTotalDisplay}
                         </p>
+                        {quoteLoading ? (
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Actualizando cotización...
+                          </p>
+                        ) : quoteData ? (
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Valores obtenidos de la cotización del sistema
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 
