@@ -429,15 +429,29 @@ export const buildSegmentOption = (label: string): SegmentOption => ({
 
 export const isItemCancelled = (item: any): boolean => {
   if (!item) return false;
+
+  // Helper to safely get string value
+  const getString = (val: any) => (typeof val === "string" ? val : "");
+
   const statusCandidates = [
-    item.eventStatusDescription,
-    item.eventStatus?.eventStatusDescription,
-    item.eventStatusName,
-    item.statusDescription,
-    item.status,
+    getString(item.eventStatusDescription),
+    getString(item.eventStatus?.eventStatusDescription),
+    getString(item.eventStatus?.eventStatusName),
+    getString(item.eventStatus?.name),
+    getString(item.eventStatusName),
+    getString(item.statusDescription),
+    getString(item.statusName),
+    getString(item.status),
+    getString(item.eventStatus), // In case it's a string
+    getString(item.state),
   ];
 
-  return statusCandidates.some(
-    (s) => typeof s === 'string' && s.toLowerCase().includes('cancelado')
-  );
+  return statusCandidates.some((s) => {
+    const lower = s.toLowerCase();
+    return (
+      lower.includes("cancelado") ||
+      lower.includes("cancelled") ||
+      lower.includes("anulado")
+    );
+  });
 };
