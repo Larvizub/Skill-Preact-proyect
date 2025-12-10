@@ -41,6 +41,38 @@ import {
 import { parseDateLocal } from "../lib/dateUtils";
 
 export function Eventos() {
+  // Helper: devuelve ms restantes hasta creationDate + 1 mes, o null si no aplica
+  const getCountdownMsForEvent = (event: Event): number | null => {
+    try {
+      const category = classifyEventStatus(event);
+      if (!["opcion1", "opcion2", "opcion3"].includes(category)) return null;
+
+      const raw = (event as any)?.creationDate ?? (event as any)?.CreationDate ?? null;
+      if (!raw) return null;
+      const creation = new Date(raw);
+      if (Number.isNaN(creation.getTime())) return null;
+
+      const addOneMonth = (d: Date) => {
+        const copy = new Date(d.getTime());
+        copy.setMonth(copy.getMonth() + 1);
+        return copy;
+      };
+
+      const deadline = addOneMonth(creation);
+      return deadline.getTime() - Date.now();
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const formatCountdownShort = (ms: number) => {
+    const abs = Math.abs(ms);
+    const days = Math.floor(abs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((abs / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((abs / (1000 * 60)) % 60);
+    if (days > 0) return `${days}d ${String(hours).padStart(2, "0")}h`;
+    return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
+  };
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilters, setStatusFilters] = useState<
@@ -798,6 +830,31 @@ export function Eventos() {
                                   <span className="line-clamp-2">
                                     {statusText || "No especificado"}
                                   </span>
+                                  {/* Countdown badge (compact) */}
+                                  {(() => {
+                                    const ms = getCountdownMsForEvent(event);
+                                    if (ms === null) return null;
+                                    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+                                    const cls =
+                                      ms > oneWeekMs
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : ms > 0
+                                        ? "bg-amber-100 text-amber-800"
+                                        : "bg-red-100 text-red-800";
+
+                                    return (
+                                      <span
+                                        className={`ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}
+                                        title={
+                                          ms <= 0
+                                            ? `Venció hace ${formatCountdownShort(ms)}`
+                                            : `Expira en ${formatCountdownShort(ms)}`
+                                        }
+                                      >
+                                        ⏳ {formatCountdownShort(ms)}
+                                      </span>
+                                    );
+                                  })()}
                                 </span>
                               </TableCell>
                               <TableCell className="text-right">
