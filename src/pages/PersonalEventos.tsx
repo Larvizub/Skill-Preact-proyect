@@ -21,6 +21,7 @@ import {
   STATUS_DEFINITION_MAP,
   classifyEventStatus,
   type StatusCategory,
+  isItemCancelled,
 } from "../lib/eventStatus";
 import FilterPill from "../components/ui/FilterPill";
 
@@ -213,12 +214,14 @@ export function PersonalEventos() {
     ];
 
     rawEvent.activities.forEach((activity: any) => {
+      if (isItemCancelled(activity)) return;
       const activityTitle = activity.activityTitle || "Sin título";
       const activityDate = activity.activityDate || activity.startDate || "-";
 
       if (!Array.isArray(activity.services)) return;
 
       activity.services.forEach((service: any) => {
+        if (isItemCancelled(service)) return;
         const serviceName = (service.serviceName || "").toLowerCase();
 
         // Verificar si es un servicio de personal

@@ -22,6 +22,7 @@ import {
   STATUS_DEFINITION_MAP,
   classifyEventStatus,
   type StatusCategory,
+  isItemCancelled,
 } from "../lib/eventStatus";
 
 interface ParqueoByDay {
@@ -194,6 +195,7 @@ export function ParqueosEventos() {
     }
 
     rawEvent.activities.forEach((activity: any) => {
+      if (isItemCancelled(activity)) return;
       const activityTitle = activity.activityTitle || "Sin título";
 
       if (!Array.isArray(activity.services)) return;
@@ -204,6 +206,7 @@ export function ParqueosEventos() {
       let serviceRealName = "Parqueo"; // Valor por defecto
 
       activity.services.forEach((service: any) => {
+        if (isItemCancelled(service)) return;
         const serviceName = (service.serviceName || "").toLowerCase();
 
         // Verificar si es un servicio de parqueo
