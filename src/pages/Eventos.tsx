@@ -47,7 +47,8 @@ export function Eventos() {
       const category = classifyEventStatus(event);
       if (!["opcion1", "opcion2", "opcion3"].includes(category)) return null;
 
-      const raw = (event as any)?.creationDate ?? (event as any)?.CreationDate ?? null;
+      const raw =
+        (event as any)?.creationDate ?? (event as any)?.CreationDate ?? null;
       if (!raw) return null;
       const creation = new Date(raw);
       if (Number.isNaN(creation.getTime())) return null;
@@ -71,7 +72,10 @@ export function Eventos() {
     const hours = Math.floor((abs / (1000 * 60 * 60)) % 24);
     const minutes = Math.floor((abs / (1000 * 60)) % 60);
     if (days > 0) return `${days}d ${String(hours).padStart(2, "0")}h`;
-    return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
+    return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(
+      2,
+      "0"
+    )}m`;
   };
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
@@ -847,8 +851,12 @@ export function Eventos() {
                                         className={`ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}
                                         title={
                                           ms <= 0
-                                            ? `Venció hace ${formatCountdownShort(ms)}`
-                                            : `Expira en ${formatCountdownShort(ms)}`
+                                            ? `Venció hace ${formatCountdownShort(
+                                                ms
+                                              )}`
+                                            : `Expira en ${formatCountdownShort(
+                                                ms
+                                              )}`
                                         }
                                       >
                                         ⏳ {formatCountdownShort(ms)}
