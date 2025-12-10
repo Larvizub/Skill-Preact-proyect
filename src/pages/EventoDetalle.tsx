@@ -11,7 +11,7 @@ import { Button } from "../components/ui/button";
 import { Spinner } from "../components/ui/spinner";
 import { apiService } from "../services/api.service";
 import type { Event } from "../services/api.service";
-import { getEventStatusText } from "../lib/eventStatus";
+import { getEventStatusText, classifyEventStatus } from "../lib/eventStatus";
 import { formatDateLocal } from "../lib/dateUtils";
 import {
   Calendar,
@@ -45,6 +45,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
   const [salonesExpanded, setSalonesExpanded] = useState(false);
   const [serviciosExpanded, setServiciosExpanded] = useState(false);
   const [catalogServices, setCatalogServices] = useState<any[]>([]);
+  // Countdown state for quotes older than 1 month
+  const [timeLeftMs, setTimeLeftMs] = useState<number | null>(null);
+  const [countdownActive, setCountdownActive] = useState(false);
+  const [deadlineDate, setDeadlineDate] = useState<Date | null>(null);
 
   useEffect(() => {
     console.log("=== EventoDetalle useEffect ===");
@@ -61,6 +65,69 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
       setLoading(false);
     }
   }, [eventIdentifier]);
+
+  // Effect: when event loads, and its status is one of the monitored statuses,
+  // start a 1s interval updating the remaining time towards creationDate + 1 month
+  useEffect(() => {
+    if (!event) {
+      setCountdownActive(false);
+      setTimeLeftMs(null);
+      setDeadlineDate(null);
+      return;
+    }
+
+    // Use internal classification ids to avoid mismatches on spelling/accents
+    const monitoredCategories = ["opcion1", "opcion2", "opcion3"];
+
+    const eventCategory = classifyEventStatus(event);
+
+    // Helper to safely parse creation date
+    const creationRaw =
+      (event as any)?.creationDate ?? (event as any)?.CreationDate ?? null;
+    const creationDate = creationRaw ? new Date(creationRaw) : null;
+
+    if (!creationDate) {
+      setCountdownActive(false);
+      setTimeLeftMs(null);
+      setDeadlineDate(null);
+      return;
+    }
+
+    if (!monitoredCategories.includes(eventCategory)) {
+      setCountdownActive(false);
+      setTimeLeftMs(null);
+      setDeadlineDate(null);
+      return;
+    }
+
+    // Add one calendar month to creationDate
+    const addOneMonth = (d: Date) => {
+      const copy = new Date(d.getTime());
+      const targetMonth = copy.getMonth() + 1;
+      copy.setMonth(targetMonth);
+      // if date rolled over (e.g., Jan 31 -> Mar 3), keep behavior as Date.setMonth does
+      return copy;
+    };
+
+    const deadline = addOneMonth(creationDate);
+    setDeadlineDate(deadline);
+
+    setCountdownActive(true);
+
+    const update = () => {
+      const now = new Date();
+      const diff = deadline.getTime() - now.getTime();
+      setTimeLeftMs(diff);
+    };
+
+    update();
+    const idInterval = window.setInterval(update, 1000);
+    return () => {
+      window.clearInterval(idInterval);
+      setCountdownActive(false);
+      setDeadlineDate(null);
+    };
+  }, [event]);
 
   const loadCatalogServices = async () => {
     try {
@@ -1542,31 +1609,137 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 Información del Sistema
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 text-xs">
-              {(event as any)?.creationDate && (
-                <div>
-                  <p className="font-medium text-muted-foreground">
-                    Fecha Creación
-                  </p>
-                  <p className="mt-1">
-                    {new Date((event as any).creationDate).toLocaleString(
-                      "es-ES"
-                    )}
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              {/* Column 1: Fecha Creación + Fecha Límite */}
+              <div>
+                {(event as any)?.creationDate && (
+                  <>
+                    <p className="font-medium text-muted-foreground">
+                      Fecha Creación
+                    </p>
+                    <p className="mt-1">
+                      {new Date((event as any).creationDate).toLocaleString(
+                        "es-ES"
+                      )}
+                    </p>
+                  </>
+                )}
+
+                {deadlineDate && (
+                  <div className="mt-3">
+                    <p className="font-medium text-muted-foreground">
+                      Fecha Límite
+                    </p>
+                    <p className="mt-1">
+                      {deadlineDate.toLocaleString("es-ES", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Column 2: Contador (centrado) */}
+              <div className="flex items-center justify-center">
+                {countdownActive && timeLeftMs !== null ? (
+                  (() => {
+                    const ms = timeLeftMs;
+                    const absMs = Math.abs(ms);
+                    const days = Math.floor(absMs / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((absMs / (1000 * 60 * 60)) % 24);
+                    const minutes = Math.floor((absMs / (1000 * 60)) % 60);
+                    const seconds = Math.floor((absMs / 1000) % 60);
+
+                    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+                    const nearExpiry = ms > 0 && ms <= oneWeekMs;
+                    const ok = ms > oneWeekMs;
+                    const expired = ms <= 0;
+
+                    const baseBadge =
+                      "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold";
+
+                    const badgeClass = ok
+                      ? baseBadge + " bg-emerald-600 text-white"
+                      : nearExpiry
+                      ? baseBadge + " bg-amber-500 text-white"
+                      : baseBadge + " bg-red-600 text-white";
+
+                    const prefix = expired ? "Venció hace" : "Expira en";
+                    const timeStr = `${days}d ${String(hours).padStart(
+                      2,
+                      "0"
+                    )}h ${String(minutes).padStart(2, "0")}m ${String(
+                      seconds
+                    ).padStart(2, "0")}s`;
+
+                    return (
+                      <div className="text-center">
+                        <div className={badgeClass}>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 8v4l3 3"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M21 12A9 9 0 113 12a9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <div className="ml-2">
+                            <div className="text-xs">{prefix}</div>
+                            <div className="text-sm font-bold">{timeStr}</div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-2">
+                          Estado:{" "}
+                          <span className="font-medium">
+                            {getEventStatusText(event)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="text-sm text-muted-foreground">No aplica</div>
+                )}
+              </div>
+
+              {/* Column 3: Última Modificación + Estado textual */}
+              <div className="text-right">
+                {(event as any)?.modificationDate && (
+                  <>
+                    <p className="font-medium text-muted-foreground">
+                      Última Modificación
+                    </p>
+                    <p className="mt-1">
+                      {new Date((event as any).modificationDate).toLocaleString(
+                        "es-ES"
+                      )}
+                    </p>
+                  </>
+                )}
+
+                <div className="mt-3">
+                  <p className="font-medium text-muted-foreground">Estado</p>
+                  <p className="mt-1 font-medium">
+                    {getEventStatusText(event)}
                   </p>
                 </div>
-              )}
-              {(event as any)?.modificationDate && (
-                <div>
-                  <p className="font-medium text-muted-foreground">
-                    Última Modificación
-                  </p>
-                  <p className="mt-1">
-                    {new Date((event as any).modificationDate).toLocaleString(
-                      "es-ES"
-                    )}
-                  </p>
-                </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </div>
