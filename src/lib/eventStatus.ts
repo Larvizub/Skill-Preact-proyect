@@ -444,10 +444,17 @@ export const isItemCancelled = (item: any): boolean => {
     getString(item.status),
     getString(item.eventStatus), // In case it's a string
     getString(item.state),
+    getString(item.roomStatus),
+    getString(item.serviceStatus),
+    getString(item.roomStatusName),
+    getString(item.serviceStatusName),
   ];
 
   return statusCandidates.some((s) => {
-    const lower = s.toLowerCase();
+    const lower = s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
     return (
       lower.includes("cancelado") ||
       lower.includes("cancelled") ||
