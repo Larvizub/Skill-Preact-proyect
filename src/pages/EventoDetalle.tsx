@@ -1257,6 +1257,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     descripcion: string;
                     precio: number;
                     cantidad: number;
+                    descuento: number;
                   }>;
                   total: number;
                 }[] = [];
@@ -1266,34 +1267,37 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 let totalImpuestosCalculado = 0;
 
                 // Helper para calcular montos de un item
-                const processItemAmounts = (item: any, quantity: number = 1) => {
-                    const price = item.priceTNI || item.priceTI || 0;
-                    const net = item.netAmount || (price * quantity);
-                    // Manejar typo 'groosAmount' del API
-                    const gross = item.grossAmount || item.groosAmount || net;
-                    const discountPct = item.discountPercentage || 0;
-                    
-                    const discount = net * (discountPct / 100);
-                    
-                    // Calcular tasa de impuesto
-                    // 1. Intentar desde precios unitarios (más seguro)
-                    let taxRate = 0;
-                    const pTNI = item.priceTNI || 0;
-                    const pTI = item.priceTI || 0;
-                    
-                    if (pTNI > 0 && pTI > pTNI) {
-                        taxRate = (pTI - pTNI) / pTNI;
-                    } else if (net > 0 && gross > net) {
-                        // 2. Fallback: inferir de totales (gross vs net)
-                        // Nota: Esto asume que gross no tiene descuento aplicado si net no lo tiene
-                        taxRate = (gross - net) / net;
-                    }
-                    
-                    // El impuesto se calcula sobre el monto descontado (base imponible)
-                    const taxableAmount = Math.max(0, net - discount);
-                    const tax = taxableAmount * taxRate;
-                    
-                    return { net, discount, tax, price };
+                const processItemAmounts = (
+                  item: any,
+                  quantity: number = 1
+                ) => {
+                  const price = item.priceTNI || item.priceTI || 0;
+                  const net = item.netAmount || price * quantity;
+                  // Manejar typo 'groosAmount' del API
+                  const gross = item.grossAmount || item.groosAmount || net;
+                  const discountPct = item.discountPercentage || 0;
+
+                  const discount = net * (discountPct / 100);
+
+                  // Calcular tasa de impuesto
+                  // 1. Intentar desde precios unitarios (más seguro)
+                  let taxRate = 0;
+                  const pTNI = item.priceTNI || 0;
+                  const pTI = item.priceTI || 0;
+
+                  if (pTNI > 0 && pTI > pTNI) {
+                    taxRate = (pTI - pTNI) / pTNI;
+                  } else if (net > 0 && gross > net) {
+                    // 2. Fallback: inferir de totales (gross vs net)
+                    // Nota: Esto asume que gross no tiene descuento aplicado si net no lo tiene
+                    taxRate = (gross - net) / net;
+                  }
+
+                  // El impuesto se calcula sobre el monto descontado (base imponible)
+                  const taxableAmount = Math.max(0, net - discount);
+                  const tax = taxableAmount * taxRate;
+
+                  return { net, discount, tax, price };
                 };
 
                 // 1. Salones (de activities.rooms)
@@ -1303,6 +1307,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     descripcion: string;
                     precio: number;
                     cantidad: number;
+                    descuento: number;
                   }>,
                   total: 0,
                 };
@@ -1311,14 +1316,16 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   (event as any).activities.forEach((activity: any) => {
                     if (activity.rooms && Array.isArray(activity.rooms)) {
                       activity.rooms.forEach((room: any) => {
-                        const { net, discount, tax, price } = processItemAmounts(room, 1);
-                        
+                        const { net, discount, tax, price } =
+                          processItemAmounts(room, 1);
+
                         if (net > 0 || price > 0) {
                           totalSalones.items.push({
                             descripcion:
                               room.roomName || room.name || "Salón sin nombre",
                             precio: price,
                             cantidad: 1,
+                            descuento: discount,
                           });
                           totalSalones.total += net;
                           totalGeneral += net;
@@ -1341,6 +1348,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                       descripcion: string;
                       precio: number;
                       cantidad: number;
+                      descuento: number;
                     }>;
                     total: number;
                   };
@@ -1352,7 +1360,8 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                       activity.services.forEach((service: any) => {
                         const cantidad =
                           service.quantity || service.serviceQuantity || 1;
-                        const { net, discount, tax, price } = processItemAmounts(service, cantidad);
+                        const { net, discount, tax, price } =
+                          processItemAmounts(service, cantidad);
 
                         if (net > 0 || price > 0) {
                           // Buscar el servicio en el catálogo usando idService
@@ -1381,6 +1390,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                               "Servicio sin nombre",
                             precio: price,
                             cantidad,
+                            descuento: discount,
                           });
                           serviciosPorGrupo[grupoIngresos].total += net;
                           totalGeneral += net;
@@ -1506,56 +1516,58 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 };
 
                 const subtotal = totalGeneral;
-                
+
                 // Priorizar valores calculados si existen items, sino buscar en la cotización
                 const hasItems = totalesPorArea.length > 0;
-                
-                const discountAmount = hasItems && totalDescuentoCalculado > 0 
-                    ? totalDescuentoCalculado 
+
+                const discountAmount =
+                  hasItems && totalDescuentoCalculado > 0
+                    ? totalDescuentoCalculado
                     : ensurePositive(
-                      pickAmount(
-                        [
-                          "totalDiscount",
-                          "totalDiscountAmount",
-                          "discountAmount",
-                          "eventDiscount",
-                          "discount",
-                          "discountValue",
-                          "eventDiscountAmount",
-                          "discountPercentage",
-                          "discountPercent",
-                          "descuento",
-                          "dscto",
-                        ],
-                        /(discount|descuento|dscto|rebate|rebaja|bonif)/i
-                      )
-                    );
-                    
-                const taxesAmount = hasItems && totalImpuestosCalculado > 0
+                        pickAmount(
+                          [
+                            "totalDiscount",
+                            "totalDiscountAmount",
+                            "discountAmount",
+                            "eventDiscount",
+                            "discount",
+                            "discountValue",
+                            "eventDiscountAmount",
+                            "discountPercentage",
+                            "discountPercent",
+                            "descuento",
+                            "dscto",
+                          ],
+                          /(discount|descuento|dscto|rebate|rebaja|bonif)/i
+                        )
+                      );
+
+                const taxesAmount =
+                  hasItems && totalImpuestosCalculado > 0
                     ? totalImpuestosCalculado
                     : ensurePositive(
-                      pickAmount(
-                        [
-                          "totalTax",
-                          "totalTaxes",
-                          "totalTaxAmount",
-                          "taxAmount",
-                          "eventTax",
-                          "taxes",
-                          "taxValue",
-                          "eventTaxes",
-                          "tax",
-                          "iva",
-                          "ivaAmount",
-                          "totalIva",
-                          "totalVat",
-                          "vat",
-                          "vatAmount",
-                          "vatValue",
-                        ],
-                        /(tax|iva|vat)/i
-                      )
-                    );
+                        pickAmount(
+                          [
+                            "totalTax",
+                            "totalTaxes",
+                            "totalTaxAmount",
+                            "taxAmount",
+                            "eventTax",
+                            "taxes",
+                            "taxValue",
+                            "eventTaxes",
+                            "tax",
+                            "iva",
+                            "ivaAmount",
+                            "totalIva",
+                            "totalVat",
+                            "vat",
+                            "vatAmount",
+                            "vatValue",
+                          ],
+                          /(tax|iva|vat)/i
+                        )
+                      );
                 const providedGrandTotalValue = pickAmount(
                   [
                     "totalAmount",
@@ -1574,6 +1586,13 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   subtotal - discountAmount + taxesAmount;
 
                 const normalizedFinalTotal = (() => {
+                  // Si tenemos items calculados, confiamos en nuestro cálculo (computedGrandTotal)
+                  // por encima del valor total que pueda venir en el JSON (providedGrandTotalValue),
+                  // ya que este último a veces no refleja los descuentos por ítem correctamente.
+                  if (hasItems && Number.isFinite(computedGrandTotal)) {
+                    return computedGrandTotal;
+                  }
+
                   if (
                     providedGrandTotalValue !== null &&
                     Number.isFinite(providedGrandTotalValue)
@@ -1708,17 +1727,31 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                                     <p className="text-muted-foreground">
                                       {item.descripcion}
                                     </p>
-                                    {item.cantidad > 1 && (
-                                      <p className="text-xs text-muted-foreground/70">
-                                        Cantidad: {item.cantidad} × $
-                                        {item.precio.toLocaleString("es-ES", {
-                                          minimumFractionDigits: 2,
-                                        })}
-                                      </p>
-                                    )}
+                                    <div className="flex flex-col gap-0.5">
+                                      {item.cantidad > 1 && (
+                                        <p className="text-xs text-muted-foreground/70">
+                                          Cantidad: {item.cantidad} × $
+                                          {item.precio.toLocaleString("es-ES", {
+                                            minimumFractionDigits: 2,
+                                          })}
+                                        </p>
+                                      )}
+                                      {item.descuento > 0 && (
+                                        <p className="text-xs text-destructive font-medium">
+                                          Descuento: -$
+                                          {item.descuento.toLocaleString(
+                                            "es-ES",
+                                            {
+                                              minimumFractionDigits: 2,
+                                              maximumFractionDigits: 2,
+                                            }
+                                          )}
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="ml-4 text-right">
-                                    <p className="font-medium">
+                                    <p className={`font-medium ${item.descuento > 0 ? "text-muted-foreground line-through text-xs" : ""}`}>
                                       $
                                       {(
                                         item.precio * item.cantidad
@@ -1727,6 +1760,14 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                                         maximumFractionDigits: 2,
                                       })}
                                     </p>
+                                    {item.descuento > 0 && (
+                                        <p className="font-medium text-foreground">
+                                            $ {((item.precio * item.cantidad) - item.descuento).toLocaleString("es-ES", {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </p>
+                                    )}
                                   </div>
                                 </div>
                               ))}
