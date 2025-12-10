@@ -1262,6 +1262,23 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 }[] = [];
 
                 let totalGeneral = 0;
+                let totalDescuentoCalculado = 0;
+                let totalImpuestosCalculado = 0;
+
+                // Helper para calcular montos de un item
+                const processItemAmounts = (item: any, quantity: number = 1) => {
+                    const price = item.priceTNI || item.priceTI || 0;
+                    const net = item.netAmount || (price * quantity);
+                    // Manejar typo 'groosAmount' del API
+                    const gross = item.grossAmount || item.groosAmount || net;
+                    const discountPct = item.discountPercentage || 0;
+                    
+                    const discount = net * (discountPct / 100);
+                    // Impuesto = Total Final - (Neto - Descuento)
+                    const tax = gross - (net - discount);
+                    
+                    return { net, discount, tax, price };
+                };
 
                 // 1. Salones (de activities.rooms)
                 const totalSalones = {
@@ -1278,15 +1295,19 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   (event as any).activities.forEach((activity: any) => {
                     if (activity.rooms && Array.isArray(activity.rooms)) {
                       activity.rooms.forEach((room: any) => {
-                        const precio = room.priceTNI || room.priceTI || 0;
-                        if (precio > 0) {
+                        const { net, discount, tax, price } = processItemAmounts(room, 1);
+                        
+                        if (net > 0 || price > 0) {
                           totalSalones.items.push({
                             descripcion:
                               room.roomName || room.name || "Salón sin nombre",
-                            precio,
+                            precio: price,
                             cantidad: 1,
                           });
-                          totalSalones.total += precio;
+                          totalSalones.total += net;
+                          totalGeneral += net;
+                          totalDescuentoCalculado += discount;
+                          totalImpuestosCalculado += tax;
                         }
                       });
                     }
@@ -1295,7 +1316,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
                 if (totalSalones.items.length > 0) {
                   totalesPorArea.push(totalSalones);
-                  totalGeneral += totalSalones.total;
                 }
 
                 // 2. Servicios agrupados por Grupo de Ingresos (revenueGroup)
@@ -1314,11 +1334,11 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   (event as any).activities.forEach((activity: any) => {
                     if (activity.services && Array.isArray(activity.services)) {
                       activity.services.forEach((service: any) => {
-                        const precio = service.priceTNI || service.priceTI || 0;
                         const cantidad =
                           service.quantity || service.serviceQuantity || 1;
+                        const { net, discount, tax, price } = processItemAmounts(service, cantidad);
 
-                        if (precio > 0) {
+                        if (net > 0 || price > 0) {
                           // Buscar el servicio en el catálogo usando idService
                           const catalogService = catalogServices.find(
                             (cs: any) => cs.idService === service.idService
@@ -1343,11 +1363,13 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                               service.serviceName ||
                               service.name ||
                               "Servicio sin nombre",
-                            precio,
+                            precio: price,
                             cantidad,
                           });
-                          serviciosPorGrupo[grupoIngresos].total +=
-                            precio * cantidad;
+                          serviciosPorGrupo[grupoIngresos].total += net;
+                          totalGeneral += net;
+                          totalDescuentoCalculado += discount;
+                          totalImpuestosCalculado += tax;
                         }
                       });
                     }
@@ -1365,7 +1387,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                         items: grupoData.items,
                         total: grupoData.total,
                       });
-                      totalGeneral += grupoData.total;
                     }
                   });
 
@@ -1394,81 +1415,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   rawEvent?.pricing,
                   rawEvent?.eventSummary,
                 ];
-
-                // Fallbacks calculados a partir de los ítems (impuestos) y porcentajes (descuentos)
-                let fallbackTaxFromItems = 0;
-                let fallbackDiscountFromItems = 0;
-
-                const addTax = (value: number) => {
-                  if (Number.isFinite(value) && value > 0) fallbackTaxFromItems += value;
-                };
-
-                const addDiscount = (value: number) => {
-                  if (Number.isFinite(value) && value > 0) fallbackDiscountFromItems += value;
-                };
-
-                // Calcular impuestos/desc. desde rooms y services si hay montos netos/brutos o porcentaje
-                const safeQty = (q: unknown, defaultVal = 1) => {
-                  const n = Number(q);
-                  return Number.isFinite(n) && n > 0 ? n : defaultVal;
-                };
-
-                if ((event as any)?.activities) {
-                  (event as any).activities.forEach((activity: any) => {
-                    const activityDiscountPct = Number(activity?.discountPercentage);
-
-                    if (activity?.rooms && Array.isArray(activity.rooms)) {
-                      activity.rooms.forEach((room: any) => {
-                        const qty = 1;
-                        const priceNoTax = Number(room?.priceTNI) || 0;
-                        const priceWithTax = Number(room?.priceTI) || 0;
-
-                        // Impuesto implícito por diferencia TI - TNI o gross - net
-                        if (priceWithTax > priceNoTax) addTax((priceWithTax - priceNoTax) * qty);
-                        if (Number.isFinite(room?.groosAmount) && Number.isFinite(room?.netAmount)) {
-                          const gross = Number(room.groosAmount);
-                          const net = Number(room.netAmount);
-                          if (gross > net) addTax(gross - net);
-                        }
-
-                        // Descuento por porcentaje específico del room
-                        const roomDiscountPct = Number(room?.discountPercentage);
-                        if (roomDiscountPct > 0 && priceNoTax > 0) {
-                          addDiscount(priceNoTax * qty * (roomDiscountPct / 100));
-                        }
-
-                        // Descuento por porcentaje a nivel actividad
-                        if (activityDiscountPct > 0 && priceNoTax > 0) {
-                          addDiscount(priceNoTax * qty * (activityDiscountPct / 100));
-                        }
-                      });
-                    }
-
-                    if (activity?.services && Array.isArray(activity.services)) {
-                      activity.services.forEach((service: any) => {
-                        const qty = safeQty(service?.quantity || service?.serviceQuantity, 1);
-                        const priceNoTax = Number(service?.priceTNI) || 0;
-                        const priceWithTax = Number(service?.priceTI) || 0;
-
-                        if (priceWithTax > priceNoTax) addTax((priceWithTax - priceNoTax) * qty);
-                        if (Number.isFinite(service?.grossAmount) && Number.isFinite(service?.netAmount)) {
-                          const gross = Number(service.grossAmount);
-                          const net = Number(service.netAmount);
-                          if (gross > net) addTax(gross - net);
-                        }
-
-                        const serviceDiscountPct = Number(service?.discountPercentage);
-                        if (serviceDiscountPct > 0 && priceNoTax > 0) {
-                          addDiscount(priceNoTax * qty * (serviceDiscountPct / 100));
-                        }
-
-                        if (activityDiscountPct > 0 && priceNoTax > 0) {
-                          addDiscount(priceNoTax * qty * (activityDiscountPct / 100));
-                        }
-                      });
-                    }
-                  });
-                }
 
                 const parseNumericValue = (value: unknown): number | null => {
                   if (value === null || value === undefined) return null;
@@ -1544,61 +1490,56 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 };
 
                 const subtotal = totalGeneral;
-                const discountPctEvent = Number((event as any)?.discountPercentage);
-
-                const discountAmount = (() => {
-                  const fromPayload = pickAmount(
-                    [
-                      "totalDiscount",
-                      "totalDiscountAmount",
-                      "discountAmount",
-                      "eventDiscount",
-                      "discount",
-                      "discountValue",
-                      "eventDiscountAmount",
-                      "discountPercentage",
-                      "discountPercent",
-                      "descuento",
-                      "dscto",
-                    ],
-                    /(discount|descuento|dscto|rebate|rebaja|bonif)/i
-                  );
-
-                  if (fromPayload !== null) return ensurePositive(fromPayload);
-
-                  const fromPctEvent =
-                    discountPctEvent > 0 ? subtotal * (discountPctEvent / 100) : 0;
-
-                  return ensurePositive(fallbackDiscountFromItems + fromPctEvent);
-                })();
-
-                const taxesAmount = (() => {
-                  const fromPayload = pickAmount(
-                    [
-                      "totalTax",
-                      "totalTaxes",
-                      "totalTaxAmount",
-                      "taxAmount",
-                      "eventTax",
-                      "taxes",
-                      "taxValue",
-                      "eventTaxes",
-                      "tax",
-                      "iva",
-                      "ivaAmount",
-                      "totalIva",
-                      "totalVat",
-                      "vat",
-                      "vatAmount",
-                      "vatValue",
-                    ],
-                    /(tax|iva|vat)/i
-                  );
-
-                  if (fromPayload !== null) return ensurePositive(fromPayload);
-
-                  return ensurePositive(fallbackTaxFromItems);
-                })();
+                
+                // Priorizar valores calculados si existen items, sino buscar en la cotización
+                const hasItems = totalesPorArea.length > 0;
+                
+                const discountAmount = hasItems && totalDescuentoCalculado > 0 
+                    ? totalDescuentoCalculado 
+                    : ensurePositive(
+                      pickAmount(
+                        [
+                          "totalDiscount",
+                          "totalDiscountAmount",
+                          "discountAmount",
+                          "eventDiscount",
+                          "discount",
+                          "discountValue",
+                          "eventDiscountAmount",
+                          "discountPercentage",
+                          "discountPercent",
+                          "descuento",
+                          "dscto",
+                        ],
+                        /(discount|descuento|dscto|rebate|rebaja|bonif)/i
+                      )
+                    );
+                    
+                const taxesAmount = hasItems && totalImpuestosCalculado > 0
+                    ? totalImpuestosCalculado
+                    : ensurePositive(
+                      pickAmount(
+                        [
+                          "totalTax",
+                          "totalTaxes",
+                          "totalTaxAmount",
+                          "taxAmount",
+                          "eventTax",
+                          "taxes",
+                          "taxValue",
+                          "eventTaxes",
+                          "tax",
+                          "iva",
+                          "ivaAmount",
+                          "totalIva",
+                          "totalVat",
+                          "vat",
+                          "vatAmount",
+                          "vatValue",
+                        ],
+                        /(tax|iva|vat)/i
+                      )
+                    );
                 const providedGrandTotalValue = pickAmount(
                   [
                     "totalAmount",
