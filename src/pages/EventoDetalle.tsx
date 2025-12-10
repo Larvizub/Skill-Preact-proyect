@@ -1372,6 +1372,9 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 const amountSources = [
                   rawEvent,
                   quoteData,
+                  quoteData?.result,
+                  quoteData?.Quote,
+                  quoteData?.quote,
                   quoteData?.totals,
                   quoteData?.Totals,
                   quoteData?.summary,
@@ -1404,7 +1407,43 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   return null;
                 };
 
-                const pickAmount = (keys: string[]): number | null => {
+                // Búsqueda profunda por clave que haga match con un patrón
+                const findNumericDeep = (
+                  source: unknown,
+                  keyPattern: RegExp,
+                  visited = new WeakSet()
+                ): number | null => {
+                  if (!source || typeof source !== "object") return null;
+                  if (visited.has(source as object)) return null;
+                  visited.add(source as object);
+
+                  if (Array.isArray(source)) {
+                    for (const item of source) {
+                      const found = findNumericDeep(item, keyPattern, visited);
+                      if (found !== null) return found;
+                    }
+                    return null;
+                  }
+
+                  for (const [k, v] of Object.entries(
+                    source as Record<string, unknown>
+                  )) {
+                    if (keyPattern.test(k)) {
+                      const parsed = parseNumericValue(v);
+                      if (parsed !== null) return parsed;
+                    }
+                    if (v && typeof v === "object") {
+                      const child = findNumericDeep(v, keyPattern, visited);
+                      if (child !== null) return child;
+                    }
+                  }
+                  return null;
+                };
+
+                const pickAmount = (
+                  keys: string[],
+                  fallbackPattern?: RegExp
+                ): number | null => {
                   for (const source of amountSources) {
                     if (!source || typeof source !== "object") continue;
                     for (const key of keys) {
@@ -1415,6 +1454,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                       if (candidate !== null) {
                         return candidate;
                       }
+                    }
+                    if (fallbackPattern) {
+                      const deep = findNumericDeep(source, fallbackPattern);
+                      if (deep !== null) return deep;
                     }
                   }
                   return null;
@@ -1439,7 +1482,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     "discountPercent",
                     "descuento",
                     "dscto",
-                  ])
+                  ], /(discount|descuento|dscto|rebate|rebaja|bonif)/i)
                 );
                 const taxesAmount = ensurePositive(
                   pickAmount([
@@ -1459,7 +1502,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     "vat",
                     "vatAmount",
                     "vatValue",
-                  ])
+                  ], /(tax|iva|vat)/i)
                 );
                 const providedGrandTotalValue = pickAmount([
                   "totalAmount",
@@ -1470,7 +1513,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   "totalQuotation",
                   "total",
                   "totalQuote",
-                ]);
+                ], /(total)/i);
 
                 const computedGrandTotal =
                   subtotal - discountAmount + taxesAmount;
