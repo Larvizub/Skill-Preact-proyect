@@ -13,6 +13,7 @@ import { apiService } from "../services/api.service";
 import type { Event } from "../services/api.service";
 import { getEventStatusText, classifyEventStatus } from "../lib/eventStatus";
 import { formatDateLocal } from "../lib/dateUtils";
+import { calculateItemAmounts } from "../lib/quoteUtils";
 import {
   Calendar,
   DollarSign,
@@ -1266,40 +1267,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 let totalDescuentoCalculado = 0;
                 let totalImpuestosCalculado = 0;
 
-                // Helper para calcular montos de un item
-                const processItemAmounts = (
-                  item: any,
-                  quantity: number = 1
-                ) => {
-                  const price = item.priceTNI || item.priceTI || 0;
-                  const net = item.netAmount || price * quantity;
-                  // Manejar typo 'groosAmount' del API
-                  const gross = item.grossAmount || item.groosAmount || net;
-                  const discountPct = item.discountPercentage || 0;
-
-                  const discount = net * (discountPct / 100);
-
-                  // Calcular tasa de impuesto
-                  // 1. Intentar desde precios unitarios (más seguro)
-                  let taxRate = 0;
-                  const pTNI = item.priceTNI || 0;
-                  const pTI = item.priceTI || 0;
-
-                  if (pTNI > 0 && pTI > pTNI) {
-                    taxRate = (pTI - pTNI) / pTNI;
-                  } else if (net > 0 && gross > net) {
-                    // 2. Fallback: inferir de totales (gross vs net)
-                    // Nota: Esto asume que gross no tiene descuento aplicado si net no lo tiene
-                    taxRate = (gross - net) / net;
-                  }
-
-                  // El impuesto se calcula sobre el monto descontado (base imponible)
-                  const taxableAmount = Math.max(0, net - discount);
-                  const tax = taxableAmount * taxRate;
-
-                  return { net, discount, tax, price };
-                };
-
                 // 1. Salones (de activities.rooms)
                 const totalSalones = {
                   area: "Salones",
@@ -1317,7 +1284,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     if (activity.rooms && Array.isArray(activity.rooms)) {
                       activity.rooms.forEach((room: any) => {
                         const { net, discount, tax, price } =
-                          processItemAmounts(room, 1);
+                          calculateItemAmounts(room, 1);
 
                         if (net > 0 || price > 0) {
                           totalSalones.items.push({
@@ -1361,7 +1328,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                         const cantidad =
                           service.quantity || service.serviceQuantity || 1;
                         const { net, discount, tax, price } =
-                          processItemAmounts(service, cantidad);
+                          calculateItemAmounts(service, cantidad);
 
                         if (net > 0 || price > 0) {
                           // Buscar el servicio en el catálogo usando idService

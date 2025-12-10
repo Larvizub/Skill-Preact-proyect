@@ -49,6 +49,7 @@ import {
 } from "../lib/eventStatus";
 import FilterPill from "../components/ui/FilterPill";
 import { Check } from "lucide-preact";
+import { calculateEventQuoteTotals } from "../lib/quoteUtils";
 
 export function Dashboard() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -421,30 +422,11 @@ export function Dashboard() {
         rawEvent?.marketSegment?.name ??
         "Sin segmento";
 
-      let eventTotal = 0;
+      const { grandTotal } = calculateEventQuoteTotals(rawEvent);
 
-      if (rawEvent?.activities && Array.isArray(rawEvent.activities)) {
-        rawEvent.activities.forEach((activity: any) => {
-          if (activity.rooms && Array.isArray(activity.rooms)) {
-            activity.rooms.forEach((room: any) => {
-              const precio = room.priceTNI || room.priceTI || 0;
-              eventTotal += precio;
-            });
-          }
-
-          if (activity.services && Array.isArray(activity.services)) {
-            activity.services.forEach((service: any) => {
-              const precio = service.priceTNI || service.priceTI || 0;
-              const cantidad = service.quantity || service.serviceQuantity || 1;
-              eventTotal += precio * cantidad;
-            });
-          }
-        });
-      }
-
-      if (eventTotal > 0) {
+      if (grandTotal > 0) {
         segmentTotals[segmentName] =
-          (segmentTotals[segmentName] || 0) + eventTotal;
+          (segmentTotals[segmentName] || 0) + grandTotal;
       }
     });
 
