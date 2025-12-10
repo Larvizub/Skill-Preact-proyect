@@ -426,3 +426,18 @@ export const buildSegmentOption = (label: string): SegmentOption => ({
   key: getMarketSegmentKeyFromLabel(label),
   label: label.trim() || SEGMENT_FALLBACK_LABEL,
 });
+
+export const isItemCancelled = (item: any): boolean => {
+  if (!item) return false;
+  const statusCandidates = [
+    item.eventStatusDescription,
+    item.eventStatus?.eventStatusDescription,
+    item.eventStatusName,
+    item.statusDescription,
+    item.status,
+  ];
+
+  return statusCandidates.some(
+    (s) => typeof s === 'string' && s.toLowerCase().includes('cancelado')
+  );
+};

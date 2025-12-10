@@ -1,3 +1,5 @@
+import { isItemCancelled } from "./eventStatus";
+
 export interface QuoteItem {
   net: number;
   discount: number;
@@ -59,9 +61,12 @@ export function calculateEventQuoteTotals(event: any): QuoteTotals {
 
   if (event?.activities && Array.isArray(event.activities)) {
     event.activities.forEach((activity: any) => {
+      if (isItemCancelled(activity)) return;
+
       // Rooms
       if (activity.rooms && Array.isArray(activity.rooms)) {
         activity.rooms.forEach((room: any) => {
+          if (isItemCancelled(room)) return;
           const { net, discount, tax } = calculateItemAmounts(room, 1);
           if (net > 0 || room.priceTNI > 0 || room.priceTI > 0) {
             totalNet += net;
@@ -74,6 +79,7 @@ export function calculateEventQuoteTotals(event: any): QuoteTotals {
       // Services
       if (activity.services && Array.isArray(activity.services)) {
         activity.services.forEach((service: any) => {
+          if (isItemCancelled(service)) return;
           const quantity = service.quantity || service.serviceQuantity || 1;
           const { net, discount, tax } = calculateItemAmounts(
             service,

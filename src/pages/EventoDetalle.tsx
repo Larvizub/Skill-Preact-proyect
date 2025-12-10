@@ -11,7 +11,11 @@ import { Button } from "../components/ui/button";
 import { Spinner } from "../components/ui/spinner";
 import { apiService } from "../services/api.service";
 import type { Event } from "../services/api.service";
-import { getEventStatusText, classifyEventStatus } from "../lib/eventStatus";
+import {
+  getEventStatusText,
+  classifyEventStatus,
+  isItemCancelled,
+} from "../lib/eventStatus";
 import { formatDateLocal } from "../lib/dateUtils";
 import { calculateItemAmounts } from "../lib/quoteUtils";
 import {
@@ -750,8 +754,9 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 {actividadesExpanded && (
                   <CardContent>
                     <div className="space-y-3">
-                      {(event as any).activities.map(
-                        (activity: any, idx: number) => (
+                      {(event as any).activities
+                        .filter((a: any) => !isItemCancelled(a))
+                        .map((activity: any, idx: number) => (
                           <div
                             key={idx}
                             className="p-3 rounded-lg bg-muted space-y-2"
@@ -840,11 +845,15 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                         (event as any).activities
                           .filter(
                             (activity: any) =>
-                              activity.rooms && activity.rooms.length > 0
+                              !isItemCancelled(activity) &&
+                              activity.rooms &&
+                              activity.rooms.length > 0
                           )
                           .forEach((activity: any) => {
-                            activity.rooms.forEach((room: any) => {
-                              // Intentar obtener scheduleDescription de la actividad o del room
+                            activity.rooms
+                              .filter((room: any) => !isItemCancelled(room))
+                              .forEach((room: any) => {
+                                // Intentar obtener scheduleDescription de la actividad o del room
                               const scheduleKey =
                                 activity.scheduleDescription ||
                                 room.schedule?.scheduleDescription ||
@@ -1012,11 +1021,15 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                         (event as any).activities
                           .filter(
                             (activity: any) =>
-                              activity.services && activity.services.length > 0
+                              !isItemCancelled(activity) &&
+                              activity.services &&
+                              activity.services.length > 0
                           )
                           .forEach((activity: any) => {
-                            activity.services.forEach((service: any) => {
-                              // Usar schedule.scheduleDescription del servicio
+                            activity.services
+                              .filter((service: any) => !isItemCancelled(service))
+                              .forEach((service: any) => {
+                                // Usar schedule.scheduleDescription del servicio
                               const scheduleKey =
                                 service.schedule?.scheduleDescription ||
                                 "Sin horario especificado";
@@ -1281,8 +1294,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
                 if ((event as any)?.activities) {
                   (event as any).activities.forEach((activity: any) => {
+                    if (isItemCancelled(activity)) return;
                     if (activity.rooms && Array.isArray(activity.rooms)) {
                       activity.rooms.forEach((room: any) => {
+                        if (isItemCancelled(room)) return;
                         const { net, discount, tax, price } =
                           calculateItemAmounts(room, 1);
 
@@ -1323,8 +1338,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
                 if ((event as any)?.activities) {
                   (event as any).activities.forEach((activity: any) => {
+                    if (isItemCancelled(activity)) return;
                     if (activity.services && Array.isArray(activity.services)) {
                       activity.services.forEach((service: any) => {
+                        if (isItemCancelled(service)) return;
                         const cantidad =
                           service.quantity || service.serviceQuantity || 1;
                         const { net, discount, tax, price } =
