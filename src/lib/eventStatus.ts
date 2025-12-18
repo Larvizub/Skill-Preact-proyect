@@ -137,7 +137,24 @@ export const getEventStatusText = (event: Event) => {
     return firstStatus;
   }
 
-  // REGLA 4: Estados mixtos (sin confirmado) → Retornar el primer estado
+  // REGLA 4: Estados mixtos (sin confirmado)
+  // Preferir el primer estado que NO sea "cancelado" si existe. Esto
+  // garantiza que, aunque la mayoría de actividades estén canceladas,
+  // si hay alguna actividad "por confirmar" u otra relevante, el
+  // evento refleje ese estado en lugar de "cancelado".
+  const firstNonCancelled = activityStatuses.find((status) => {
+    const normalized = status
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+    return !(
+      normalized.includes("cancelado") || normalized.includes("cancelada")
+    );
+  });
+
+  if (firstNonCancelled) return firstNonCancelled;
+
   return firstStatus;
 };
 
@@ -317,7 +334,18 @@ export const classifyEventStatus = (event: Event): StatusCategory => {
   }
 
   // REGLA 4: Estados mixtos (sin confirmado y sin todas cancelado)
-  // Retornar el primer estado encontrado
+  // Preferir el primer estado que NO sea "cancelado" si existe, de manera
+  // que eventos con mayoría de actividades canceladas pero con alguna
+  // actividad "por confirmar" u otro estado relevante se muestren con
+  // ese estado en lugar de "cancelado".
+  const firstNonCanceled = activityStatuses.find((s) => s !== "cancelado");
+  if (firstNonCanceled) {
+    console.log(
+      `[classifyEventStatus] Evento #${rawEvent?.idEvent} tiene estados MIXTOS → tomando primer estado NO-CANCELADO: ${firstNonCanceled}`
+    );
+    return firstNonCanceled;
+  }
+
   console.log(
     `[classifyEventStatus] Evento #${rawEvent?.idEvent} tiene estados MIXTOS → tomando primer estado: ${firstStatus}`
   );
