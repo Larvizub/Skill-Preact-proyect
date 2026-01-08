@@ -18,7 +18,8 @@
     "lucide-preact": "^0.544.0",
     "preact": "^10.27.2",
     "preact-router": "^4.1.2",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.2",

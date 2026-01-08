@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { apiService, type Event } from "../services/api.service";
-import { Search, Calendar, X, Eye, ArrowLeft, Check } from "lucide-preact";
+import { Search, Calendar, X, Eye, ArrowLeft, Check, FileSpreadsheet } from "lucide-preact";
 import {
   getEventStatusText,
   STATUS_DEFINITIONS,
@@ -24,6 +24,8 @@ import {
   isItemCancelled,
 } from "../lib/eventStatus";
 import FilterPill from "../components/ui/FilterPill";
+import { generatePersonalExcelReport } from "../lib/reportUtils";
+import { Spinner } from "../components/ui/spinner";
 
 interface PersonalItem {
   serviceName: string;
@@ -48,6 +50,7 @@ export function PersonalEventos() {
   };
 
   const [loading, setLoading] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [filterType, setFilterType] = useState<
     "dateRange" | "eventId" | "eventName"
   >("dateRange");
@@ -158,6 +161,23 @@ export function PersonalEventos() {
       alert("Error al buscar eventos. Por favor, intenta nuevamente.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (events.length === 0) {
+      alert("No hay eventos con personal para exportar. Realiza una búsqueda primero.");
+      return;
+    }
+
+    setGeneratingReport(true);
+    try {
+      await generatePersonalExcelReport(events);
+    } catch (error: any) {
+      console.error("Error al generar el reporte:", error);
+      alert(error.message || "Hubo un error al generar el reporte de Excel.");
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
@@ -425,15 +445,30 @@ export function PersonalEventos() {
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button onClick={handleSearch} disabled={loading}>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handleSearch} disabled={loading || generatingReport} className="flex-1 min-w-[140px]">
                 <Search className="w-4 h-4 mr-2" />
                 {loading ? "Buscando..." : "Buscar"}
               </Button>
+
+              <Button
+                onClick={handleExportExcel}
+                className="flex-1 min-w-[140px] bg-green-600 hover:bg-green-700 text-white border-none shadow-sm"
+                disabled={loading || generatingReport || events.length === 0}
+              >
+                {generatingReport ? (
+                  <Spinner className="h-4 w-4 mr-2" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                )}
+                {generatingReport ? "Generando..." : "Reporte Excel"}
+              </Button>
+
               <Button
                 onClick={clearFilters}
                 variant="outline"
-                disabled={loading}
+                className="flex-1 min-w-[140px]"
+                disabled={loading || generatingReport}
               >
                 <X className="w-4 h-4 mr-2" />
                 Limpiar

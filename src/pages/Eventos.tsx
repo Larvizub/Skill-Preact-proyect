@@ -24,7 +24,7 @@ import {
 } from "../components/ui/table";
 import { apiService } from "../services/api.service";
 import type { Event } from "../services/api.service";
-import { Search, Calendar, Eye, Filter, X, Check } from "lucide-preact";
+import { Search, Calendar, Eye, Filter, X, Check, FileSpreadsheet } from "lucide-preact";
 import {
   STATUS_DEFINITIONS,
   DEFAULT_STATUS_FILTERS,
@@ -39,6 +39,7 @@ import {
   type StatusCategory,
 } from "../lib/eventStatus";
 import { parseDateLocal } from "../lib/dateUtils";
+import { generateEventsExcelReport } from "../lib/reportUtils";
 
 export function Eventos() {
   // Helper: devuelve ms restantes hasta creationDate + 1 mes, o null si no aplica
@@ -79,6 +80,7 @@ export function Eventos() {
   };
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [statusFilters, setStatusFilters] = useState<
     Record<StatusCategory, boolean>
   >(() => ({ ...DEFAULT_STATUS_FILTERS }));
@@ -324,6 +326,25 @@ export function Eventos() {
 
   const handleSearch = () => {
     loadEvents();
+  };
+
+  const handleExportExcel = async () => {
+    if (filteredEvents.length === 0) {
+      alert(
+        "No hay eventos visibles para exportar. Ajusta los filtros o realiza una búsqueda."
+      );
+      return;
+    }
+
+    setGeneratingReport(true);
+    try {
+      await generateEventsExcelReport(filteredEvents);
+    } catch (error) {
+      console.error("Error al generar el reporte:", error);
+      alert("Hubo un error al generar el reporte de Excel.");
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   const clearFilters = () => {
@@ -695,19 +716,33 @@ export function Eventos() {
               </div>
 
               {/* Botones de acción */}
-              <div className="flex gap-2 pt-2">
+              <div className="flex flex-wrap gap-2 pt-2">
                 <Button
                   onClick={handleSearch}
-                  className="flex-1"
+                  className="flex-1 min-w-[140px]"
                   disabled={loading}
                 >
                   <Search className="h-4 w-4 mr-2" />
                   {loading ? "Buscando..." : "Buscar Eventos"}
                 </Button>
+
                 <Button
-                  variant="outline"
+                  onClick={handleExportExcel}
+                  className="flex-1 min-w-[140px] bg-green-600 hover:bg-green-700 text-white border-none shadow-sm"
+                  disabled={loading || generatingReport || events.length === 0}
+                >
+                  {generatingReport ? (
+                    <Spinner className="h-4 w-4 mr-2" />
+                  ) : (
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  )}
+                  {generatingReport ? "Generando..." : "Reporte Excel"}
+                </Button>
+
+                <Button
+                  variant="ghost"
                   onClick={clearFilters}
-                  className="flex items-center gap-2"
+                  className="flex-1 min-w-[140px]"
                   disabled={loading}
                 >
                   <X className="h-4 w-4" />
