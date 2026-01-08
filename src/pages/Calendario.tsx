@@ -404,9 +404,8 @@ export function Calendario() {
                 Segmento de Mercado
               </span>
               {segmentsLoading && availableSegments.length === 0 ? (
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="inline-flex h-3 w-3 animate-spin rounded-full border border-primary border-t-transparent" />
-                  <span>Cargando segmentos…</span>
+                <div className="flex items-center gap-2 py-1">
+                  <Spinner size="sm" />
                 </div>
               ) : availableSegments.length > 0 ? (
                 <div className="flex flex-wrap gap-2.5">
@@ -448,7 +447,7 @@ export function Calendario() {
           <CardContent>
             {loading ? (
               <div className="text-center py-8">
-                <Spinner size="md" label="Cargando calendario..." />
+                <Spinner size="md" />
               </div>
             ) : (
               <div className="space-y-4">

@@ -84,8 +84,8 @@ export function Coordinadores() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-full">
-          <Spinner size="lg" label="Cargando coordinadores..." />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Spinner size="lg" />
         </div>
       </Layout>
     );

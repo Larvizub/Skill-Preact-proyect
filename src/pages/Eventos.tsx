@@ -24,7 +24,15 @@ import {
 } from "../components/ui/table";
 import { apiService } from "../services/api.service";
 import type { Event } from "../services/api.service";
-import { Search, Calendar, Eye, Filter, X, Check, FileSpreadsheet } from "lucide-preact";
+import {
+  Search,
+  Calendar,
+  Eye,
+  Filter,
+  X,
+  Check,
+  FileSpreadsheet,
+} from "lucide-preact";
 import {
   STATUS_DEFINITIONS,
   DEFAULT_STATUS_FILTERS,
@@ -669,9 +677,11 @@ export function Eventos() {
                   Segmento de Mercado
                 </span>
                 {segmentsLoading && availableSegments.length === 0 ? (
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="inline-flex h-3 w-3 animate-spin rounded-full border border-primary border-t-transparent" />
-                    <span>Cargando segmentos…</span>
+                  <div className="flex items-center gap-2 py-1">
+                    <Spinner size="sm" />
+                    <span className="text-[10px] text-muted-foreground animate-pulse">
+                      Cargando...
+                    </span>
                   </div>
                 ) : availableSegments.length > 0 ? (
                   <div className="flex flex-wrap gap-2.5">
@@ -782,7 +792,7 @@ export function Eventos() {
             <div className="relative">
               {loading && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/70 backdrop-blur-sm">
-                  <Spinner size="lg" label="Cargando eventos..." />
+                  <Spinner size="lg" />
                 </div>
               )}
               {showEmptyState ? (

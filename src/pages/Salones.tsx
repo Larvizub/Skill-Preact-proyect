@@ -63,8 +63,8 @@ export function Salones() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-full">
-          <Spinner size="lg" label="Cargando salones..." />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Spinner size="lg" />
         </div>
       </Layout>
     );

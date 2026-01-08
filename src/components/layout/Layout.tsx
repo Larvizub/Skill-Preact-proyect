@@ -34,7 +34,7 @@ export function Layout({ children }: LayoutProps) {
           </button>
         </div>
 
-        <div className="container mx-auto px-6 pt-6 pb-6 min-h-0">
+        <div className="container mx-auto px-6 pt-6 pb-6 min-h-0 flex flex-col flex-1">
           {children}
         </div>
       </main>

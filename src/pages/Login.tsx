@@ -9,6 +9,7 @@ import {
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { Spinner } from "../components/ui/spinner";
 import { authService } from "../services/auth.service";
 
 export function Login() {
@@ -106,7 +107,11 @@ export function Login() {
               </div>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Cargando..." : "Iniciar Sesión"}
+              {loading ? (
+                <Spinner size="sm" className="border-t-white border-white/30" />
+              ) : (
+                "Iniciar Sesión"
+              )}
             </Button>
           </form>
         </CardContent>

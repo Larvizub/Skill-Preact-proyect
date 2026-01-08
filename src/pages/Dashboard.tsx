@@ -456,8 +456,8 @@ export function Dashboard() {
   if (shouldShowInitialSpinner) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-full">
-          <Spinner size="lg" label="Preparando dashboard..." />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Spinner size="lg" />
         </div>
       </Layout>
     );
@@ -469,7 +469,7 @@ export function Dashboard() {
         {showOverlay && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-sm">
             <div className="rounded-md border border-muted bg-background/90 px-6 py-4 shadow-lg">
-              <Spinner size="md" label="Actualizando información del mes..." />
+              <Spinner size="md" />
             </div>
           </div>
         )}
@@ -585,11 +585,13 @@ export function Dashboard() {
                   "—"
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {stats.lastMonthLoaded
-                  ? `vs mes anterior (${stats.lastMonthEvents} eventos)`
-                  : "Cargando datos del mes anterior…"}
-              </p>
+              <div className="text-xs text-muted-foreground">
+                {stats.lastMonthLoaded ? (
+                  `vs mes anterior (${stats.lastMonthEvents} eventos)`
+                ) : (
+                  <Spinner size="sm" />
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -640,14 +642,14 @@ export function Dashboard() {
                       <span className="font-medium capitalize">
                         {month.label}
                       </span>
-                      <span className="text-muted-foreground">
-                        {month.count !== null
-                          ? `${month.count} evento${
-                              month.count === 1 ? "" : "s"
-                            }`
-                          : month.loading
-                          ? "Cargando…"
-                          : "Sin datos"}
+                      <span className="text-muted-foreground inline-flex items-center">
+                        {month.count !== null ? (
+                          `${month.count} evento${month.count === 1 ? "" : "s"}`
+                        ) : month.loading ? (
+                          <Spinner size="sm" className="ml-1" />
+                        ) : (
+                          "Sin datos"
+                        )}
                       </span>
                     </div>
                     {month.count !== null ? (
@@ -666,12 +668,7 @@ export function Dashboard() {
                     ) : (
                       <div className="flex items-center gap-2 pt-1">
                         {month.loading ? (
-                          <>
-                            <span className="inline-flex h-4 w-4 animate-spin rounded-full border border-primary border-t-transparent" />
-                            <span className="text-xs text-muted-foreground">
-                              Cargando datos…
-                            </span>
-                          </>
+                          <Spinner size="sm" />
                         ) : (
                           <button
                             type="button"
