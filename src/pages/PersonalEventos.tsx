@@ -14,7 +14,15 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { apiService, type Event } from "../services/api.service";
-import { Search, Calendar, X, Eye, ArrowLeft, Check, FileSpreadsheet } from "lucide-preact";
+import {
+  Search,
+  Calendar,
+  X,
+  Eye,
+  ArrowLeft,
+  Check,
+  FileSpreadsheet,
+} from "lucide-preact";
 import {
   getEventStatusText,
   STATUS_DEFINITIONS,
@@ -22,8 +30,9 @@ import {
   classifyEventStatus,
   type StatusCategory,
   isItemCancelled,
+  DEFAULT_STATUS_FILTERS,
 } from "../lib/eventStatus";
-import FilterPill from "../components/ui/FilterPill";
+import { FilterPill } from "../components/ui/FilterPill";
 import { generatePersonalExcelReport } from "../lib/reportUtils";
 import { Spinner } from "../components/ui/spinner";
 
@@ -71,13 +80,7 @@ export function PersonalEventos() {
   const [personalData, setPersonalData] = useState<PersonalItem[]>([]);
   const [statusFilters, setStatusFilters] = useState<
     Record<StatusCategory, boolean>
-  >(() => {
-    const initial: Record<string, boolean> = {};
-    STATUS_DEFINITIONS.forEach((def) => {
-      initial[def.id] = true;
-    });
-    return initial as Record<StatusCategory, boolean>;
-  });
+  >(DEFAULT_STATUS_FILTERS);
 
   const handleSearch = async () => {
     // Validar que haya criterios de búsqueda
@@ -166,7 +169,9 @@ export function PersonalEventos() {
 
   const handleExportExcel = async () => {
     if (events.length === 0) {
-      alert("No hay eventos con personal para exportar. Realiza una búsqueda primero.");
+      alert(
+        "No hay eventos con personal para exportar. Realiza una búsqueda primero."
+      );
       return;
     }
 
@@ -446,7 +451,11 @@ export function PersonalEventos() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={handleSearch} disabled={loading || generatingReport} className="flex-1 min-w-[140px]">
+              <Button
+                onClick={handleSearch}
+                disabled={loading || generatingReport}
+                className="flex-1 min-w-[140px]"
+              >
                 <Search className="w-4 h-4 mr-2" />
                 {loading ? "Buscando..." : "Buscar"}
               </Button>
@@ -514,7 +523,10 @@ export function PersonalEventos() {
                       <TableCell>
                         {(() => {
                           const rawEvent = event as any;
-                          const firstActivity = rawEvent?.activities?.[0];
+                          const nonCancelledActivities = (
+                            rawEvent?.activities || []
+                          ).filter((a: any) => !isItemCancelled(a));
+                          const firstActivity = nonCancelledActivities[0];
                           return (
                             firstActivity?.activityDate ||
                             firstActivity?.startDate ||

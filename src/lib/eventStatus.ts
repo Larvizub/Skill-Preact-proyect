@@ -464,7 +464,18 @@ export const isItemCancelled = (item: any): boolean => {
   // 2. Check specific known fields (string or object with name/desc)
   const checkString = (s: any) => {
     if (!s) return false;
-    const str = typeof s === "string" ? s : s.name || s.description || "";
+    const str =
+      typeof s === "string"
+        ? s
+        : s.name ||
+          s.description ||
+          s.eventStatusDescription ||
+          s.statusDescription ||
+          s.eventStatusName ||
+          s.statusName ||
+          s.serviceStatusName ||
+          s.roomStatusName ||
+          "";
     if (typeof str !== "string") return false;
     const lower = str
       .toLowerCase()
@@ -472,6 +483,7 @@ export const isItemCancelled = (item: any): boolean => {
       .replace(/[\u0300-\u036f]/g, "");
     return (
       lower.includes("cancelado") ||
+      lower.includes("cancelada") ||
       lower.includes("cancelled") ||
       lower.includes("anulado")
     );
