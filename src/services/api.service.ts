@@ -297,6 +297,8 @@ export interface Event {
   internalComments: string;
   creationDate: string;
   modificationDate: string;
+  icca?: boolean | number;
+  sustainable?: boolean | number;
   // Propiedades opcionales para simplificar
   salesAgent?: any;
   eventType?: any;

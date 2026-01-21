@@ -34,6 +34,8 @@ import {
   Home,
   ArrowLeft,
   ChevronDown,
+  ShieldCheck,
+  Leaf,
 } from "lucide-preact";
 
 interface EventoDetalleProps {
@@ -301,6 +303,20 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
     rawEvent?.size?.eventSizeName ??
     null;
 
+  const isICCA =
+    rawEvent?.icca === true ||
+    rawEvent?.icca === 1 ||
+    rawEvent?.icca === "true" ||
+    rawEvent?.isICCA === true;
+  const isSostenible =
+    rawEvent?.sustainable === true ||
+    rawEvent?.sustainable === 1 ||
+    rawEvent?.sustainable === "true" ||
+    rawEvent?.sostenible === true ||
+    rawEvent?.sostenible === 1 ||
+    rawEvent?.sostenible === "true" ||
+    rawEvent?.isSustainable === true;
+
   return (
     <Layout>
       <div className="space-y-6 pb-8">
@@ -472,6 +488,41 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                       <p className="text-sm mt-1">{(event as any).reference}</p>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Row 4: ICCA / Sostenible */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Evento ICCA
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {isICCA ? (
+                      <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium">
+                        <ShieldCheck className="h-4 w-4" />
+                        <span className="text-sm">Sí</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground italic">No</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Sostenible
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {isSostenible ? (
+                      <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                        <Leaf className="h-4 w-4" />
+                        <span className="text-sm">Sí</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground italic">No</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
