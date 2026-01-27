@@ -15,6 +15,7 @@ import {
   getEventStatusText,
   classifyEventStatus,
   isItemCancelled,
+  getEventStatusColor,
 } from "../lib/eventStatus";
 import { formatDateLocal } from "../lib/dateUtils";
 import { calculateItemAmounts } from "../lib/quoteUtils";
@@ -346,7 +347,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 ID Interno: {event.idEvent}
               </span>
               <div className="text-sm">
-                <span className="font-medium text-foreground">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventStatusColor(event)} text-white`}>
                   {statusLabel}
                 </span>
               </div>
@@ -438,7 +439,9 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     Estatus
                   </p>
                   <div className="text-sm mt-1">
-                    <div>{statusLabel}</div>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventStatusColor(event)} text-white`}>
+                      {statusLabel}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1977,9 +1980,11 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
                 <div className="mt-3">
                   <p className="font-medium text-muted-foreground">Estado</p>
-                  <p className="mt-1 font-medium">
-                    {getEventStatusText(event)}
-                  </p>
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventStatusColor(event)} text-white`}>
+                      {statusLabel}
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardContent>
