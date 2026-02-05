@@ -41,6 +41,7 @@ interface ParqueoByDay {
   serviceName: string;
   activityTitle: string;
   totalQuantity: number;
+  unitPrice: number;
   totalPriceTNI: number;
   totalPriceTI: number;
   totalDiscount: number;
@@ -233,6 +234,7 @@ export function ParqueosEventos() {
       let dayPriceTNI = 0;
       let dayPriceTI = 0;
       let dayDiscount = 0;
+      let dayUnitPrice = 0;
       let serviceRealName = "Parqueo"; // Valor por defecto
 
       activity.services.forEach((service: any) => {
@@ -242,18 +244,18 @@ export function ParqueosEventos() {
         // Verificar si es un servicio de parqueo
         if (serviceName.includes("parqueo")) {
           const quantity = service.quantity || 0;
-          const { discount } = calculateItemAmounts(service, quantity);
-          const priceTNI = service.priceTNI || 0;
-          const priceTI = service.priceTI || 0;
+          const { net, discount } = calculateItemAmounts(service, quantity);
 
           // Capturar el nombre real del servicio (primera vez que se encuentra)
           if (dayQuantity === 0) {
             serviceRealName = service.serviceName || "Parqueo";
+            const priceTNI = service.priceTNI || 0;
+            dayUnitPrice = priceTNI;
           }
 
           dayQuantity += quantity;
-          dayPriceTNI += priceTNI * quantity;
-          dayPriceTI += priceTI * quantity;
+          dayPriceTNI += net;
+          dayPriceTI += (net - discount);
           dayDiscount += discount;
         }
       });
@@ -264,6 +266,7 @@ export function ParqueosEventos() {
           serviceName: serviceRealName,
           activityTitle,
           totalQuantity: dayQuantity,
+          unitPrice: dayUnitPrice,
           totalPriceTNI: dayPriceTNI,
           totalPriceTI: dayPriceTI,
           totalDiscount: dayDiscount,
@@ -470,8 +473,7 @@ export function ParqueosEventos() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Número</TableHead>
+                    <TableHead>ID Skill</TableHead>
                     <TableHead>Título</TableHead>
                     <TableHead>Fecha Inicio</TableHead>
                     <TableHead>Fecha Fin</TableHead>
@@ -483,9 +485,6 @@ export function ParqueosEventos() {
                 <TableBody>
                   {events.map((event) => (
                     <TableRow key={(event as any).idEvent}>
-                      <TableCell className="font-mono text-xs">
-                        {(event as any).idEvent}
-                      </TableCell>
                       <TableCell className="font-medium">
                         {(event as any).eventNumber}
                       </TableCell>
@@ -589,13 +588,14 @@ export function ParqueosEventos() {
                         <TableHead>Servicio</TableHead>
                         <TableHead>Actividad</TableHead>
                         <TableHead className="text-right">Cantidad</TableHead>
+                        <TableHead className="text-right">
+                          Precio Unitario (TNI)
+                        </TableHead>
                         <TableHead className="text-right">Descuento</TableHead>
                         <TableHead className="text-right">
                           Total Cotización (TNI)
                         </TableHead>
-                        <TableHead className="text-right">
-                          Total Cotización (TI)
-                        </TableHead>
+                        <TableHead className="text-right">TOTAL</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -610,13 +610,16 @@ export function ParqueosEventos() {
                           <TableCell className="text-right">
                             {item.totalQuantity}
                           </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(item.unitPrice)}
+                          </TableCell>
                           <TableCell className="text-right text-red-500">
                             {formatCurrency(item.totalDiscount)}
                           </TableCell>
                           <TableCell className="text-right">
                             {formatCurrency(item.totalPriceTNI)}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right font-bold">
                             {formatCurrency(item.totalPriceTI)}
                           </TableCell>
                         </TableRow>
@@ -627,6 +630,7 @@ export function ParqueosEventos() {
                         <TableCell className="text-right">
                           {totalQuantity}
                         </TableCell>
+                        <TableCell className="text-right">-</TableCell>
                         <TableCell className="text-right text-red-500">
                           {formatCurrency(totalDiscount)}
                         </TableCell>

@@ -220,8 +220,11 @@ export async function generatePersonalExcelReport(events: any[]) {
 
                   const quantity =
                     service.quantity || service.serviceQuantity || 0;
+                  const { net, discount } = calculateItemAmounts(
+                    service,
+                    quantity
+                  );
                   const priceTNI = service.priceTNI || 0;
-                  const priceTI = service.priceTI || 0;
 
                   reportData.push({
                     "ID del evento": event.idEvent || event.eventNumber || "",
@@ -229,9 +232,10 @@ export async function generatePersonalExcelReport(events: any[]) {
                     "Tipo de Personal": normalizedName,
                     Actividad: activityTitle,
                     "Cantidad Total": quantity,
+                    Descuento: discount,
                     "Precio Unitario TNI": priceTNI,
-                    "Total Cotización TNI": priceTNI * quantity,
-                    "Total Cotización TI": priceTI * quantity,
+                    "Total Cotización TNI": net,
+                    TOTAL: net - discount,
                   });
                 }
               });
@@ -304,9 +308,11 @@ export async function generateParqueosExcelReport(events: any[]) {
                 if (serviceName.includes("parqueo")) {
                   const quantity =
                     service.quantity || service.serviceQuantity || 0;
-                  const { discount } = calculateItemAmounts(service, quantity);
+                  const { net, discount } = calculateItemAmounts(
+                    service,
+                    quantity
+                  );
                   const priceTNI = service.priceTNI || 0;
-                  const priceTI = service.priceTI || 0;
 
                   reportData.push({
                     "ID del Evento": event.idEvent || event.eventNumber || "",
@@ -314,9 +320,10 @@ export async function generateParqueosExcelReport(events: any[]) {
                     Servicio: service.serviceName || "Parqueo",
                     Actividades: activityTitle,
                     Cantidad: quantity,
+                    "Precio Unitario TNI": priceTNI,
                     Descuento: discount,
-                    "Total cotización TNI": priceTNI * quantity,
-                    "Total cotización TI": priceTI * quantity,
+                    "Total cotización TNI": net,
+                    TOTAL: net - discount,
                   });
                 }
               });

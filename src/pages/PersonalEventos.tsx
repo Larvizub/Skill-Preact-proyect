@@ -35,18 +35,22 @@ import {
 import { FilterPill } from "../components/ui/FilterPill";
 import { generatePersonalExcelReport } from "../lib/reportUtils";
 import { Spinner } from "../components/ui/spinner";
+import { calculateItemAmounts } from "../lib/quoteUtils";
 
 interface PersonalItem {
   serviceName: string;
   totalQuantity: number;
   totalPriceTNI: number;
   totalPriceTI: number;
+  totalDiscount: number;
   activities: Array<{
     activityTitle: string;
     activityDate: string;
     quantity: number;
     priceTNI: number;
     priceTI: number;
+    discount: number;
+    total: number;
   }>;
 }
 
@@ -273,8 +277,9 @@ export function PersonalEventos() {
         }
 
         const quantity = service.quantity || 0;
+        const { net, discount } = calculateItemAmounts(service, quantity);
         const priceTNI = service.priceTNI || 0;
-        const priceTI = service.priceTI || 0;
+        const finalAmount = net - discount;
 
         if (!personalMap.has(normalizedName)) {
           personalMap.set(normalizedName, {
@@ -282,20 +287,24 @@ export function PersonalEventos() {
             totalQuantity: 0,
             totalPriceTNI: 0,
             totalPriceTI: 0,
+            totalDiscount: 0,
             activities: [],
           });
         }
 
         const item = personalMap.get(normalizedName)!;
         item.totalQuantity += quantity;
-        item.totalPriceTNI += priceTNI * quantity;
-        item.totalPriceTI += priceTI * quantity;
+        item.totalPriceTNI += net;
+        item.totalPriceTI += finalAmount;
+        item.totalDiscount += discount;
         item.activities.push({
           activityTitle,
           activityDate,
           quantity,
           priceTNI,
-          priceTI,
+          priceTI: service.priceTI || 0, // Mantenemos el TI original por si se ocupa, pero el final es el calculado
+          discount,
+          total: finalAmount,
         });
       });
     });
@@ -317,6 +326,10 @@ export function PersonalEventos() {
 
   const totalQuantity = personalData.reduce(
     (sum, item) => sum + item.totalQuantity,
+    0
+  );
+  const totalDiscount = personalData.reduce(
+    (sum, item) => sum + item.totalDiscount,
     0
   );
   const totalPriceTNI = personalData.reduce(
@@ -496,8 +509,7 @@ export function PersonalEventos() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Número</TableHead>
+                    <TableHead>ID Skill</TableHead>
                     <TableHead>Título</TableHead>
                     <TableHead>Fecha Inicio</TableHead>
                     <TableHead>Fecha Fin</TableHead>
@@ -509,9 +521,6 @@ export function PersonalEventos() {
                 <TableBody>
                   {events.map((event) => (
                     <TableRow key={(event as any).idEvent}>
-                      <TableCell className="font-mono text-xs">
-                        {(event as any).idEvent}
-                      </TableCell>
                       <TableCell className="font-medium">
                         {(event as any).eventNumber}
                       </TableCell>
@@ -619,15 +628,14 @@ export function PersonalEventos() {
                         <TableHead className="text-right">
                           Cantidad Total
                         </TableHead>
+                        <TableHead className="text-right">Descuento</TableHead>
                         <TableHead className="text-right">
                           Precio Unitario (TNI)
                         </TableHead>
                         <TableHead className="text-right">
                           Total Cotización (TNI)
                         </TableHead>
-                        <TableHead className="text-right">
-                          Total Cotización (TI)
-                        </TableHead>
+                        <TableHead className="text-right">TOTAL</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -644,6 +652,9 @@ export function PersonalEventos() {
                               <TableCell className="text-right">
                                 {activity.quantity}
                               </TableCell>
+                              <TableCell className="text-right text-red-500">
+                                {formatCurrency(activity.discount)}
+                              </TableCell>
                               <TableCell className="text-right">
                                 {formatCurrency(activity.priceTNI)}
                               </TableCell>
@@ -652,10 +663,8 @@ export function PersonalEventos() {
                                   activity.priceTNI * activity.quantity
                                 )}
                               </TableCell>
-                              <TableCell className="text-right">
-                                {formatCurrency(
-                                  activity.priceTI * activity.quantity
-                                )}
+                              <TableCell className="text-right font-bold">
+                                {formatCurrency(activity.total)}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -666,6 +675,9 @@ export function PersonalEventos() {
                         <TableCell>-</TableCell>
                         <TableCell className="text-right">
                           {totalQuantity}
+                        </TableCell>
+                        <TableCell className="text-right text-red-500">
+                          {formatCurrency(totalDiscount)}
                         </TableCell>
                         <TableCell className="text-right">-</TableCell>
                         <TableCell className="text-right">
