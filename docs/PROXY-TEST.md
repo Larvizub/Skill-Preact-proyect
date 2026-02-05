@@ -1,41 +1,59 @@
-# Test de Cloud Function Proxy
+# Pruebas del Cloud Function Proxy (actualizado)
 
-## Pasos para Verificar
+La app usa una Cloud Function (Gen2) como proxy para evitar CORS y para soportar rutas legacy. El código está en `functions/src/index.ts` y su base remota por defecto es `https://grupoheroicaapi.skillsuite.net/app/wssuite/api`.
 
-1. **Ver si la función está desplegada:**
+## ✅ Comprobaciones rápidas
 
-```powershell
+- Ver funciones desplegadas:
+
+```bash
 npx firebase functions:list
 ```
 
-2. **Hacer una petición de prueba directa a la Cloud Function:**
+- Ver logs (Gen2):
 
-```powershell
-# Usando curl (si está instalado)
-curl -X POST https://us-central1-gh-skillsuit.cloudfunctions.net/proxyApi/authenticate `
-  -H "Content-Type: application/json" `
-  -d '{\"username\":\"wsSk4Api\",\"password\":\"5qT2Uu!qIjG%$XeD\",\"companyAuthId\":\"xudQREZBrfGdw0ag8tE3NR3XhM6LGa\",\"companyId\":\"\"}'
+```bash
+npx firebase functions:log --region us-central1
 ```
 
-3. **Verificar en el navegador:**
+## 🧪 Probar la función localmente (Emulator)
 
-- Abre: https://gh-skillsuit.web.app
-- Shift + F5 (hard reload)
-- Intenta login
-- Abre Network tab y busca la petición `/api/authenticate`
-- Revisa el Response
+1. Instala y corre los emuladores:
 
-## Estado Esperado
+```bash
+pnpm install
+pnpm -w firebase emulators:start --only functions
+```
 
-La función debería:
+2. Llama al endpoint local (ejemplo con curl):
 
-- Recibir `/api/authenticate` desde el navegador
-- Filtrar los prefijos y construir: `https://grupoheroicaapi.skillsuite.net/app/wssuite/api/authenticate`
-- Reenviar la petición POST con el body JSON
-- Retornar la respuesta (éxito o error del backend)
+```bash
+curl -X POST http://localhost:5001/<YOUR_PROJECT>/us-central1/proxyApiV2/authenticate \
+  -H "Content-Type: application/json" \
+  -d '{"username":"wsSk4Api","password":"5qT2Uu!qIjG%$XeD","companyAuthId":"xudQREZBrfGdw0ag8tE3NR3XhM6LGa","companyId":""}'
+```
 
-Si aún ves 403, es posible que:
+> Reemplaza `<YOUR_PROJECT>` por tu projectId de Firebase.
 
-1. El deploy no se haya propagado completamente (esperar 2-3 minutos)
-2. Hay cache en el navegador o en Firebase Hosting
-3. La función no se está ejecutando (ver logs con `npx firebase functions:log`)
+## 🔁 Llamada de prueba a producción (curl)
+
+```bash
+curl -X POST https://us-central1-gh-skillsuit.cloudfunctions.net/proxyApiV2/authenticate \
+  -H "Content-Type: application/json" \
+  -d '{"username":"wsSk4Api","password":"5qT2Uu!qIjG%$XeD","companyAuthId":"xudQREZBrfGdw0ag8tE3NR3XhM6LGa","companyId":""}'
+```
+
+## 🔎 Qué revisar en caso de fallo
+
+- **403/401**: revisa que `companyAuthId` e `idData` estén correctos; revisa las cabeceras que llegan al proxy.
+- **CORS**: la función está configurada para permitir origenes (`cors({ origin: true })`) — los problemas habituales provienen del remote API.
+- **404/405**: el proxy intenta rutas candidatas (por ejemplo `/events/getrooms` y fallback a `/GetRooms`). Revisa logs para ver qué ruta respondió.
+
+## 🧾 Logs y diagnóstico
+
+- El proxy imprime intentos y rutas en consola (`proxy: forwarding`, `proxy: response`). Revisa estos mensajes en los logs de Firebase para diagnosticar fallbacks y errores.
+
+## Notas finales
+
+- Para deploy: `pnpm -w firebase deploy --only functions` (ajusta según scripts del repo).
+- Si quieres, agrego un script en `package.json` para facilitar llamadas de prueba con `curl` y un pequeño README con ejemplos de payloads para cada endpoint. ✅

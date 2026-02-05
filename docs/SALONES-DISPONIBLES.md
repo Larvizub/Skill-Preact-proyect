@@ -1,126 +1,54 @@
-# Módulo de Salones Disponibles
+# Salones Disponibles — Documentación actualizada
 
-## Descripción
+## 📍 Resumen
 
-El módulo "Salones Disponibles" permite consultar qué salones están disponibles (sin ocupación) en un rango de fechas específico.
+El módulo muestra salones que no están ocupados en un rango de fechas dado y evita falsos positivos debido a problemas de zona horaria. Componente principal: `src/pages/SalonesDisponibles.tsx`.
 
-## Ubicación
+## 🛠️ Comportamiento y flujo
 
-- **Ruta:** `/salones-disponibles`
-- **Componente:** `src/pages/SalonesDisponibles.tsx`
-- **API Method:** `apiService.getAvailableRooms(startDate, endDate)`
+1. Usuario selecciona `startDate` y `endDate` (formato `yyyy-MM-dd`).
+2. El sistema convierte las fechas a rangos locales: `startDate + 'T00:00:00'` y `endDate + 'T23:59:59'` para evitar desfases por zona horaria.
+3. Se solicita la lista de eventos y salones al backend (`apiService.getRooms()` y `apiService.getEvents({ startDate, endDate })`).
+4. Se marca un salón como ocupado si existe al menos un evento que solape:
 
-## Funcionalidad
-
-### Selector de Rango de Fechas
-
-- Dos selectores de fecha (inicio y fin)
-- Validación de que fecha inicio < fecha fin
-- Formato de fecha: `yyyy-MM-dd`
-- **Fix aplicado:** Corrección del desfase de zona horaria agregando `T00:00:00` al parsear fechas
-
-### Lógica de Disponibilidad
-
-El módulo determina si un salón está disponible verificando:
-
-1. **Obtiene todos los salones** del sistema
-2. **Obtiene todos los eventos** que se solapen con el rango de fechas
-3. **Detecta solapamiento de fechas:**
-   ```typescript
-   const overlaps = eventStart <= requestEnd && eventEnd >= requestStart;
-   ```
-4. **Marca salones como ocupados** si tienen eventos asignados en el rango
-5. **Filtra y retorna** solo salones:
-   - NO ocupados en el rango
-   - Con estado `roomActive = true`
-
-### Correcciones Aplicadas
-
-#### Problema 1: Salones ocupados aparecían como disponibles
-
-**Causa:** No se verificaba si el evento se solapaba con el rango de fechas solicitado.
-
-**Solución:** Implementada verificación de solapamiento de fechas:
-
-```typescript
+```ts
 const requestStart = new Date(startDate + "T00:00:00");
 const requestEnd = new Date(endDate + "T23:59:59");
-
 const eventStart = new Date(event.startDate);
 const eventEnd = new Date(event.endDate);
-
-// Verificar solapamiento
 const overlaps = eventStart <= requestEnd && eventEnd >= requestStart;
 ```
 
-#### Problema 2: DatePicker seleccionaba día anterior
+5. Resultado: lista filtrada de salones con `roomActive === true` y que **no** tienen solapamiento en el rango.
 
-**Causa:** `new Date("2025-10-15")` se interpreta como UTC medianoche, que en zona horaria local puede ser el día anterior.
+## ✅ Validaciones
 
-**Solución:** Agregar componente de tiempo para forzar zona horaria local:
+- `startDate` y `endDate` son obligatorios.
+- `startDate` <= `endDate`.
+- Mostrar mensajes claros si no hay salones disponibles.
 
-```typescript
-// Antes (incorrecto):
-new Date(value); // "2025-10-15" → Oct 14 en zona -5
+## UI y detalles
 
-// Después (correcto):
-new Date(value + "T00:00:00"); // "2025-10-15T00:00:00" → Oct 15
-```
+- Tabla con columnas: Nombre, Área (m²), Altura, Capacidad, Estado, Acciones.
+- Botón `Ver` abre modal con: descripción, dimensiones, montajes y banner de disponibilidad.
+- Loading states y mensajes (No results / Error) para buena UX.
 
-## Tabla de Resultados
+## Debugging y buenas prácticas
 
-Muestra los salones disponibles con:
-
-- Nombre del salón
-- Área (m²)
-- Altura (m)
-- Capacidad máxima
-- Estado (Activo/Inactivo)
-- Botón "Ver" para detalles
-
-## Modal de Detalles
-
-Al hacer clic en "Ver", muestra:
-
-- Descripción del salón
-- Dimensiones completas
-- Montajes disponibles
-- **Banner de disponibilidad** confirmando el rango de fechas
-
-## Debugging
-
-El método incluye logs en consola:
+- Añadir logs durante la fase de desarrollo para ver conteos y rangos:
 
 ```
-Disponibilidad de salones del 2025-10-15 al 2025-10-20:
-- Total de salones: 25
-- Salones ocupados: 8
-- Salones disponibles: 17
+console.info(`Disponibilidad ${startDate} → ${endDate}: total ${rooms.length}, ocupados ${occupiedCount}, disponibles ${availableCount}`)
 ```
 
-## Navegación
+- Añadir tests unitarios para la función de solapamiento (edge cases: inicio/fin en el límite, eventos de un día, eventos multimensuales).
 
-- Acceso desde Sidebar: **"Salones Disponibles"**
-- Icono: CalendarCheck
-- Posición: Entre "Salones" e "Inventario"
+## Recomendaciones futuras
 
-## Casos de Uso
+- Cachear resultados de `getRooms()` porque suelen cambiar poco.
+- Permitir búsqueda por ubicación/área para filtrar resultados.
+- Mostrar overlay en caso de salones con disponibilidad parcial (eventos que no ocupan todo el rango).
 
-1. **Planificación de eventos:** Verificar disponibilidad antes de crear cotización
-2. **Optimización de recursos:** Identificar salones subutilizados
-3. **Resolución de conflictos:** Detectar salones alternativos para fechas solicitadas
+---
 
-## Validaciones
-
-- Fecha de inicio requerida
-- Fecha de fin requerida
-- Fecha inicio <= Fecha fin
-- Solo salones activos en resultados
-- Verificación de solapamiento precisa
-
-## Notas Técnicas
-
-- Usa la misma tabla/modal que el módulo "Salones"
-- Reutiliza componentes UI: DatePicker, Table, Dialog
-- Implementa loading states y mensajes de estado
-- Responsive design con grid adaptativo
+¿Quieres que agregue tests unitarios de ejemplo para la lógica de solapamiento? Puedo crear un pequeño archivo `src/lib/availability.test.ts` y añadirlo al pipeline de CI. ✅
