@@ -304,6 +304,7 @@ export async function generateParqueosExcelReport(events: any[]) {
                 if (serviceName.includes("parqueo")) {
                   const quantity =
                     service.quantity || service.serviceQuantity || 0;
+                  const { discount } = calculateItemAmounts(service, quantity);
                   const priceTNI = service.priceTNI || 0;
                   const priceTI = service.priceTI || 0;
 
@@ -313,6 +314,7 @@ export async function generateParqueosExcelReport(events: any[]) {
                     Servicio: service.serviceName || "Parqueo",
                     Actividades: activityTitle,
                     Cantidad: quantity,
+                    Descuento: discount,
                     "Total cotización TNI": priceTNI * quantity,
                     "Total cotización TI": priceTI * quantity,
                   });

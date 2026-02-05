@@ -35,6 +35,7 @@ import {
 } from "../lib/eventStatus";
 import { generateParqueosExcelReport } from "../lib/reportUtils";
 import { Spinner } from "../components/ui/spinner";
+import { calculateItemAmounts } from "../lib/quoteUtils";
 
 interface ParqueoByDay {
   serviceName: string;
@@ -42,6 +43,7 @@ interface ParqueoByDay {
   totalQuantity: number;
   totalPriceTNI: number;
   totalPriceTI: number;
+  totalDiscount: number;
 }
 
 export function ParqueosEventos() {
@@ -230,6 +232,7 @@ export function ParqueosEventos() {
       let dayQuantity = 0;
       let dayPriceTNI = 0;
       let dayPriceTI = 0;
+      let dayDiscount = 0;
       let serviceRealName = "Parqueo"; // Valor por defecto
 
       activity.services.forEach((service: any) => {
@@ -239,6 +242,7 @@ export function ParqueosEventos() {
         // Verificar si es un servicio de parqueo
         if (serviceName.includes("parqueo")) {
           const quantity = service.quantity || 0;
+          const { discount } = calculateItemAmounts(service, quantity);
           const priceTNI = service.priceTNI || 0;
           const priceTI = service.priceTI || 0;
 
@@ -250,6 +254,7 @@ export function ParqueosEventos() {
           dayQuantity += quantity;
           dayPriceTNI += priceTNI * quantity;
           dayPriceTI += priceTI * quantity;
+          dayDiscount += discount;
         }
       });
 
@@ -261,6 +266,7 @@ export function ParqueosEventos() {
           totalQuantity: dayQuantity,
           totalPriceTNI: dayPriceTNI,
           totalPriceTI: dayPriceTI,
+          totalDiscount: dayDiscount,
         });
       }
     });
@@ -281,6 +287,10 @@ export function ParqueosEventos() {
   // Calcular totales generales
   const totalQuantity = parqueoData.reduce(
     (sum, item) => sum + item.totalQuantity,
+    0
+  );
+  const totalDiscount = parqueoData.reduce(
+    (sum, item) => sum + item.totalDiscount,
     0
   );
   const totalPriceTNI = parqueoData.reduce(
@@ -579,6 +589,7 @@ export function ParqueosEventos() {
                         <TableHead>Servicio</TableHead>
                         <TableHead>Actividad</TableHead>
                         <TableHead className="text-right">Cantidad</TableHead>
+                        <TableHead className="text-right">Descuento</TableHead>
                         <TableHead className="text-right">
                           Total Cotización (TNI)
                         </TableHead>
@@ -599,6 +610,9 @@ export function ParqueosEventos() {
                           <TableCell className="text-right">
                             {item.totalQuantity}
                           </TableCell>
+                          <TableCell className="text-right text-red-500">
+                            {formatCurrency(item.totalDiscount)}
+                          </TableCell>
                           <TableCell className="text-right">
                             {formatCurrency(item.totalPriceTNI)}
                           </TableCell>
@@ -612,6 +626,9 @@ export function ParqueosEventos() {
                         <TableCell>{""}</TableCell>
                         <TableCell className="text-right">
                           {totalQuantity}
+                        </TableCell>
+                        <TableCell className="text-right text-red-500">
+                          {formatCurrency(totalDiscount)}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(totalPriceTNI)}
