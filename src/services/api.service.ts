@@ -250,6 +250,7 @@ export interface EventMarketSubSegment {
   idMarketSubSegment: number;
   marketSubSegmentName?: string;
   marketSegmentName?: string;
+  idMarketSegment?: number;
 }
 
 export interface EventSubType {
@@ -257,6 +258,10 @@ export interface EventSubType {
   eventSubTypeName?: string;
   eventTypeName?: string;
   idEventType?: number;
+  idMarketSubSegment?: number;
+  idEventMarketSubSegment?: number;
+  idEventSubSegment?: number;
+  subSegmentId?: number;
 }
 
 export interface EventPaymentForm {
@@ -664,15 +669,21 @@ export const apiService = {
   getEventTypes: () =>
     withFallback(
       () =>
-        apiRequest<EventType[]>("/events/geteventtypes", {
+        apiRequest<{
+          success: boolean;
+          result?: { eventTypes?: any[] };
+        }>("/events/geteventtypes", {
           method: "GET",
         }),
       () =>
-        apiRequest<EventType[]>("/GetEventTypes", {
+        apiRequest<{
+          success: boolean;
+          result?: { eventTypes?: any[] };
+        }>("/GetEventTypes", {
           method: "POST",
           body: buildPayload(),
         })
-    ),
+    ).then((response) => response.result?.eventTypes || []),
 
   // Segmentos de mercado
   getEventMarketSegments: async () => {
@@ -933,6 +944,20 @@ export const apiService = {
     }
 
     const types = await apiService.getEventTypes();
+    const fromNested = (types || []).flatMap((type: any) =>
+      (type.subTypes || []).map((sub: any) => ({
+        ...sub,
+        idEventType: sub.idEventType ?? type.idEventType ?? type.id,
+        eventTypeName: sub.eventTypeName ?? type.eventTypeName ?? type.name,
+      }))
+    );
+
+    if (fromNested.length > 0) {
+      return fromNested.filter(
+        (entry: EventSubType) => (entry.idEventSubType ?? 0) > 0
+      );
+    }
+
     return (types || [])
       .map((type: any) => ({
         idEventSubType: Number(

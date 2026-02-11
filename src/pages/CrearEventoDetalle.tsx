@@ -405,10 +405,30 @@ export function CrearEventoDetalle() {
 
         if (!isMounted) return;
 
+        const derivedSubsegments = (segmentData || []).flatMap((segment: any) =>
+          (segment.marketSubSegments || segment.eventMarketSubSegments || []).map(
+            (sub: any) => ({
+              ...sub,
+              idMarketSegment:
+                sub.idMarketSegment ??
+                segment.idMarketSegment ??
+                segment.idEventMarketSegment ??
+                segment.id,
+              marketSegmentName:
+                sub.marketSegmentName ??
+                segment.marketSegmentName ??
+                segment.eventMarketSegmentName ??
+                segment.name,
+            })
+          )
+        );
+
         setClients(clientData || []);
         setSalesAgents(salesData || []);
         setSegments(segmentData || []);
-        setSubsegments(subsegmentData || []);
+        setSubsegments(
+          derivedSubsegments.length > 0 ? derivedSubsegments : subsegmentData || []
+        );
         setSubtypes(subtypeData || []);
         setCharacters(
           (characterData || []).map((item: any) => ({
@@ -603,12 +623,52 @@ export function CrearEventoDetalle() {
     }));
   }, [subsegments, segmentOptions]);
 
+  const subtypeOptions = useMemo(() => {
+    return (subtypes || [])
+      .map((sub: any) => ({
+        id: String(sub.idEventSubType ?? sub.id ?? ""),
+        name: sub.eventSubTypeName ?? sub.eventTypeName ?? sub.name ?? "",
+        subsegmentId: String(
+          sub.idMarketSubSegment ??
+            sub.idEventMarketSubSegment ??
+            sub.idEventSubsegment ??
+            sub.idEventSubSegment ??
+            sub.subSegmentId ??
+            ""
+        ),
+      }))
+      .filter((sub) => sub.id && sub.name.trim().length > 0);
+  }, [subtypes]);
+
   const filteredSubsegments = useMemo(() => {
     if (!eventState.idEventSegment) return [];
+    const hasSegmentMapping = subsegmentOptions.some(
+      (sub) => sub.segmentId && sub.segmentId.trim().length > 0
+    );
+    if (!hasSegmentMapping) return subsegmentOptions;
+
     return subsegmentOptions.filter(
-      (sub) => sub.segmentId === eventState.idEventSegment
+      (sub) =>
+        sub.segmentId === eventState.idEventSegment ||
+        !sub.segmentId ||
+        sub.segmentId.trim().length === 0
     );
   }, [eventState.idEventSegment, subsegmentOptions]);
+
+  const filteredSubtypes = useMemo(() => {
+    if (!eventState.idEventSubsegment) return subtypeOptions;
+    const hasSubsegmentMapping = subtypeOptions.some(
+      (sub) => sub.subsegmentId && sub.subsegmentId.trim().length > 0
+    );
+    if (!hasSubsegmentMapping) return subtypeOptions;
+
+    return subtypeOptions.filter(
+      (sub) =>
+        sub.subsegmentId === eventState.idEventSubsegment ||
+        !sub.subsegmentId ||
+        sub.subsegmentId.trim().length === 0
+    );
+  }, [eventState.idEventSubsegment, subtypeOptions]);
   useEffect(() => {
     if (!eventState.idEventSegment) {
       if (eventState.idEventSubsegment) {
@@ -624,6 +684,22 @@ export function CrearEventoDetalle() {
       updateEventField("idEventSubsegment", "");
     }
   }, [eventState.idEventSegment, eventState.idEventSubsegment, filteredSubsegments]);
+
+  useEffect(() => {
+    if (!eventState.idEventSubsegment) {
+      if (eventState.idEventSubtype) {
+        updateEventField("idEventSubtype", "");
+      }
+      return;
+    }
+
+    const stillValid = filteredSubtypes.some(
+      (sub) => sub.id === eventState.idEventSubtype
+    );
+    if (!stillValid && eventState.idEventSubtype) {
+      updateEventField("idEventSubtype", "");
+    }
+  }, [eventState.idEventSubsegment, eventState.idEventSubtype, filteredSubtypes]);
   const updateEventField = (
     field: keyof EventFormState,
     value: string | boolean
@@ -1235,12 +1311,13 @@ export function CrearEventoDetalle() {
                     <label className="text-sm font-medium">Subsegmento</label>
                     <Select
                       value={eventState.idEventSubsegment}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         updateEventField(
                           "idEventSubsegment",
                           (e.target as HTMLSelectElement).value
-                        )
-                      }
+                        );
+                        updateEventField("idEventSubtype", "");
+                      }}
                       disabled={!eventState.idEventSegment}
                     >
                       <option value="">
@@ -1270,12 +1347,9 @@ export function CrearEventoDetalle() {
                       }
                     >
                       <option value="">Selecciona subtipo</option>
-                      {subtypes.map((subtype) => (
-                        <option
-                          key={subtype.idEventSubType}
-                          value={String(subtype.idEventSubType)}
-                        >
-                          {subtype.eventSubTypeName || subtype.eventTypeName}
+                      {filteredSubtypes.map((subtype) => (
+                        <option key={subtype.id} value={subtype.id}>
+                          {subtype.name}
                         </option>
                       ))}
                     </Select>
@@ -1559,7 +1633,7 @@ export function CrearEventoDetalle() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Exencion</label>
+                    <label className="text-sm font-medium">Impuestos</label>
                     <Select
                       value={eventState.idExemption}
                       onChange={(e) =>
@@ -1569,7 +1643,7 @@ export function CrearEventoDetalle() {
                         )
                       }
                     >
-                      <option value="">Selecciona exencion</option>
+                      <option value="">Selecciona impuestos</option>
                       {taxExemptions.map((ex) => (
                         <option
                           key={ex.idTaxExemption}
