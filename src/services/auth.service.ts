@@ -7,12 +7,24 @@
 // 2. Si no está, usar `/api` para que Vite/dev o el hosting puedan reenviar a la API real
 const resolvedBaseURL = import.meta.env.VITE_API_BASE || "/api";
 
+export type Recinto = "CCCR" | "CCCI" | "CEVP";
+
+const RECINTO_ID_DATA: Record<Recinto, string> = {
+  CCCR: "14",
+  CCCI: "22",
+  CEVP: "29",
+};
+
+const storedRecinto = (localStorage.getItem("skill_recinto") ||
+  "CCCR") as Recinto;
+const initialIdData = RECINTO_ID_DATA[storedRecinto] || "14";
+
 export const API_CONFIG = {
   baseURL: resolvedBaseURL,
   username: "wsSk4Api",
   password: "5qT2Uu!qIjG%$XeD",
   companyAuthId: "xudQREZBrfGdw0ag8tE3NR3XhM6LGa",
-  idData: "14",
+  idData: initialIdData,
 };
 
 // Tipos para la autenticación
@@ -25,6 +37,7 @@ export interface AuthResponse {
 // Servicio de autenticación
 class AuthService {
   private token: string | null = null;
+  private recinto: Recinto = storedRecinto;
 
   async authenticate(): Promise<boolean> {
     try {
@@ -73,6 +86,17 @@ class AuthService {
       console.error("Authentication error:", error);
       return false;
     }
+  }
+
+  getRecinto(): Recinto {
+    return this.recinto;
+  }
+
+  setRecinto(recinto: Recinto): void {
+    this.recinto = recinto;
+    API_CONFIG.idData = RECINTO_ID_DATA[recinto];
+    localStorage.setItem("skill_recinto", recinto);
+    localStorage.setItem("skill_id_data", API_CONFIG.idData);
   }
 
   getToken(): string | null {

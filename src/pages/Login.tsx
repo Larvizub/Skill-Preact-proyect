@@ -9,12 +9,14 @@ import {
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { Select } from "../components/ui/select";
 import { Spinner } from "../components/ui/spinner";
 import { authService } from "../services/auth.service";
 
 export function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [recinto, setRecinto] = useState(authService.getRecinto());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,6 +27,7 @@ export function Login() {
 
     try {
       console.log("Attempting authentication...");
+      authService.setRecinto(recinto);
       const success = await authService.authenticate();
 
       if (success) {
@@ -70,6 +73,25 @@ export function Login() {
               <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
                 Usuario, Contraseña y presionar el botón Iniciar Sesión".
               </p>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="recinto" className="text-sm font-medium">
+                Recinto
+              </label>
+              <Select
+                id="recinto"
+                value={recinto}
+                onChange={(e) => {
+                  const value = (e.target as HTMLSelectElement).value;
+                  setRecinto(value as typeof recinto);
+                  authService.setRecinto(value as typeof recinto);
+                }}
+                disabled={loading}
+              >
+                <option value="CCCR">CCCR</option>
+                <option value="CCCI">CCCI</option>
+                <option value="CEVP">CEVP</option>
+              </Select>
             </div>
             <div className="space-y-2">
               <label htmlFor="username" className="text-sm font-medium">
