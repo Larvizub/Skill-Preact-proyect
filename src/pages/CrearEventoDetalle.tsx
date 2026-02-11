@@ -58,6 +58,7 @@ interface EventFormState {
   idSalesAgent: string;
   idEventSubsegment: string;
   idEventSegment: string;
+  idEventType: string;
   idEventSubtype: string;
   idEventCharacter: string;
   idEventSector: string;
@@ -220,6 +221,7 @@ const initialEventState: EventFormState = {
   idSalesAgent: "",
   idEventSubsegment: "",
   idEventSegment: "",
+  idEventType: "",
   idEventSubtype: "",
   idEventCharacter: "",
   idEventSector: "",
@@ -295,6 +297,7 @@ export function CrearEventoDetalle() {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [salesAgents, setSalesAgents] = useState<SalesAgent[]>([]);
+  const [eventTypes, setEventTypes] = useState<any[]>([]);
   const [subsegments, setSubsegments] = useState<EventMarketSubSegment[]>([]);
   const [segments, setSegments] = useState<MarketSegment[]>([]);
   const [subtypes, setSubtypes] = useState<EventSubType[]>([]);
@@ -331,6 +334,19 @@ export function CrearEventoDetalle() {
   const [activityPackages, setActivityPackages] = useState<ActivityPackage[]>([]);
 
   useEffect(() => {
+    if (!loadingOptions) return;
+    const timer = setTimeout(() => {
+      setLoadingOptions(false);
+      setError((prev) =>
+        prev ??
+          "Algunos parametros tardaron demasiado en cargar. Revisa la conexion o el API."
+      );
+    }, 20000);
+
+    return () => clearTimeout(timer);
+  }, [loadingOptions]);
+
+  useEffect(() => {
     let isMounted = true;
 
     const loadOptions = async () => {
@@ -342,7 +358,10 @@ export function CrearEventoDetalle() {
           fallback: T
         ): Promise<T> => {
           try {
-            return await loader();
+            const timeoutPromise = new Promise<T>((_resolve, reject) =>
+              setTimeout(() => reject(new Error("timeout")), 15000)
+            );
+            return await Promise.race([loader(), timeoutPromise]);
           } catch (err) {
             console.warn(`loadOptions: ${label} fallo`, err);
             return fallback;
@@ -354,6 +373,7 @@ export function CrearEventoDetalle() {
           salesData,
           segmentData,
           subsegmentData,
+          eventTypeData,
           subtypeData,
           characterData,
           sectorData,
@@ -382,6 +402,7 @@ export function CrearEventoDetalle() {
             () => apiService.getEventMarketSubSegments(),
             []
           ),
+          safeLoad("eventTypes", () => apiService.getEventTypes(), []),
           safeLoad("eventSubTypes", () => apiService.getEventSubTypes(), []),
           safeLoad("eventCharacters", () => apiService.getEventCharacters(), []),
           safeLoad("eventSectors", () => apiService.getEventSectors(), []),
@@ -425,6 +446,7 @@ export function CrearEventoDetalle() {
 
         setClients(clientData || []);
         setSalesAgents(salesData || []);
+        setEventTypes(eventTypeData || []);
         setSegments(segmentData || []);
         setSubsegments(
           derivedSubsegments.length > 0 ? derivedSubsegments : subsegmentData || []
@@ -623,11 +645,34 @@ export function CrearEventoDetalle() {
     }));
   }, [subsegments, segmentOptions]);
 
+  const eventTypeOptions = useMemo(() => {
+    const normalized = (eventTypes || [])
+      .map((type: any) => ({
+        id: String(type.idEventType ?? type.id ?? ""),
+        name: type.eventTypeName ?? type.name ?? "",
+      }))
+      .filter((type) => type.id && type.name.trim().length > 0);
+
+    if (normalized.length > 0) return normalized;
+
+    const derived = new Map<string, string>();
+    (subtypes || []).forEach((sub: any) => {
+      const id = String(sub.idEventType ?? sub.eventTypeId ?? "");
+      const name = sub.eventTypeName ?? "";
+      if (id && name && !derived.has(id)) {
+        derived.set(id, name);
+      }
+    });
+
+    return Array.from(derived.entries()).map(([id, name]) => ({ id, name }));
+  }, [eventTypes, subtypes]);
+
   const subtypeOptions = useMemo(() => {
     return (subtypes || [])
       .map((sub: any) => ({
         id: String(sub.idEventSubType ?? sub.id ?? ""),
         name: sub.eventSubTypeName ?? sub.eventTypeName ?? sub.name ?? "",
+        typeId: String(sub.idEventType ?? sub.eventTypeId ?? ""),
         subsegmentId: String(
           sub.idMarketSubSegment ??
             sub.idEventMarketSubSegment ??
@@ -656,19 +701,19 @@ export function CrearEventoDetalle() {
   }, [eventState.idEventSegment, subsegmentOptions]);
 
   const filteredSubtypes = useMemo(() => {
-    if (!eventState.idEventSubsegment) return subtypeOptions;
-    const hasSubsegmentMapping = subtypeOptions.some(
-      (sub) => sub.subsegmentId && sub.subsegmentId.trim().length > 0
+    if (!eventState.idEventType) return [];
+    const hasTypeMapping = subtypeOptions.some(
+      (sub) => sub.typeId && sub.typeId.trim().length > 0
     );
-    if (!hasSubsegmentMapping) return subtypeOptions;
+    if (!hasTypeMapping) return subtypeOptions;
 
     return subtypeOptions.filter(
       (sub) =>
-        sub.subsegmentId === eventState.idEventSubsegment ||
-        !sub.subsegmentId ||
-        sub.subsegmentId.trim().length === 0
+        sub.typeId === eventState.idEventType ||
+        !sub.typeId ||
+        sub.typeId.trim().length === 0
     );
-  }, [eventState.idEventSubsegment, subtypeOptions]);
+  }, [eventState.idEventType, subtypeOptions]);
   useEffect(() => {
     if (!eventState.idEventSegment) {
       if (eventState.idEventSubsegment) {
@@ -686,7 +731,7 @@ export function CrearEventoDetalle() {
   }, [eventState.idEventSegment, eventState.idEventSubsegment, filteredSubsegments]);
 
   useEffect(() => {
-    if (!eventState.idEventSubsegment) {
+    if (!eventState.idEventType) {
       if (eventState.idEventSubtype) {
         updateEventField("idEventSubtype", "");
       }
@@ -699,7 +744,7 @@ export function CrearEventoDetalle() {
     if (!stillValid && eventState.idEventSubtype) {
       updateEventField("idEventSubtype", "");
     }
-  }, [eventState.idEventSubsegment, eventState.idEventSubtype, filteredSubtypes]);
+  }, [eventState.idEventType, eventState.idEventSubtype, filteredSubtypes]);
   const updateEventField = (
     field: keyof EventFormState,
     value: string | boolean
@@ -843,6 +888,7 @@ export function CrearEventoDetalle() {
       return "Selecciona el segmento del evento.";
     if (!eventState.idEventSubsegment)
       return "Selecciona el subsegmento del evento.";
+    if (!eventState.idEventType) return "Selecciona el tipo del evento.";
     if (!eventState.idEventSubtype) return "Selecciona el subtipo del evento.";
     if (!eventState.idEventCharacter)
       return "Selecciona el caracter del evento.";
@@ -889,6 +935,7 @@ export function CrearEventoDetalle() {
         discountPercentage: toNumberOrNull(eventState.discountPercentage),
         idSalesAgent: toNumberOrNull(eventState.idSalesAgent),
         idEventSubsegment: toNumberOrNull(eventState.idEventSubsegment),
+        idEventType: toNumberOrNull(eventState.idEventType),
         idEventSubtype: toNumberOrNull(eventState.idEventSubtype),
         idEventCharacter: toNumberOrNull(eventState.idEventCharacter),
         idEventSector: toNumberOrNull(eventState.idEventSector),
@@ -1146,15 +1193,15 @@ export function CrearEventoDetalle() {
           </DialogContent>
         </Dialog>
 
-        {loadingOptions ? (
-          <div className="flex flex-col items-center justify-center min-h-[200px] gap-3">
-            <Spinner size="lg" />
-            <p className="text-sm text-muted-foreground">
-              Cargando parametros del formulario...
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
+        <div className="space-y-6">
+          {loadingOptions && (
+            <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
+              <Spinner size="sm" />
+              <span className="text-muted-foreground">
+                Cargando parametros del formulario...
+              </span>
+            </div>
+          )}
             <Card>
               <CardHeader
                 className="cursor-pointer"
@@ -1237,7 +1284,7 @@ export function CrearEventoDetalle() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Fecha inicio</label>
                     <DatePicker
@@ -1262,9 +1309,6 @@ export function CrearEventoDetalle() {
                       }
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
                       Coordinador de cuenta
@@ -1289,6 +1333,9 @@ export function CrearEventoDetalle() {
                       ))}
                     </Select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Segmento</label>
                     <Select
@@ -1311,13 +1358,12 @@ export function CrearEventoDetalle() {
                     <label className="text-sm font-medium">Subsegmento</label>
                     <Select
                       value={eventState.idEventSubsegment}
-                      onChange={(e) => {
+                      onChange={(e) =>
                         updateEventField(
                           "idEventSubsegment",
                           (e.target as HTMLSelectElement).value
-                        );
-                        updateEventField("idEventSubtype", "");
-                      }}
+                        )
+                      }
                       disabled={!eventState.idEventSegment}
                     >
                       <option value="">
@@ -1332,6 +1378,26 @@ export function CrearEventoDetalle() {
                       ))}
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Tipo del evento</label>
+                    <Select
+                      value={eventState.idEventType}
+                      onChange={(e) => {
+                        updateEventField(
+                          "idEventType",
+                          (e.target as HTMLSelectElement).value
+                        );
+                        updateEventField("idEventSubtype", "");
+                      }}
+                    >
+                      <option value="">Selecciona tipo</option>
+                      {eventTypeOptions.map((type) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1339,6 +1405,7 @@ export function CrearEventoDetalle() {
                     <label className="text-sm font-medium">Subtipo</label>
                     <Select
                       value={eventState.idEventSubtype}
+                      disabled={!eventState.idEventType}
                       onChange={(e) =>
                         updateEventField(
                           "idEventSubtype",
@@ -1346,7 +1413,11 @@ export function CrearEventoDetalle() {
                         )
                       }
                     >
-                      <option value="">Selecciona subtipo</option>
+                      <option value="">
+                        {eventState.idEventType
+                          ? "Selecciona subtipo"
+                          : "Selecciona tipo primero"}
+                      </option>
                       {filteredSubtypes.map((subtype) => (
                         <option key={subtype.id} value={subtype.id}>
                           {subtype.name}
@@ -2893,7 +2964,6 @@ export function CrearEventoDetalle() {
               </Button>
             </div>
           </div>
-        )}
       </div>
     </Layout>
   );

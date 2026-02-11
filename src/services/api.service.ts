@@ -683,15 +683,43 @@ export const apiService = {
           method: "POST",
           body: buildPayload(),
         })
-    ).then((response) => response.result?.eventTypes || []),
+    ).then((payload) => {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray((payload as any)?.eventTypes))
+        return (payload as any).eventTypes;
+      if (Array.isArray((payload as any)?.result?.eventTypes))
+        return (payload as any).result.eventTypes;
+      return [];
+    }),
 
   // Segmentos de mercado
   getEventMarketSegments: async () => {
-    const response = await apiRequest<{
-      success: boolean;
-      result: { eventMarketSegments: MarketSegment[] };
-    }>("/events/geteventmarketsegments");
-    return response.result.eventMarketSegments || [];
+    const response = await withFallback(
+      () =>
+        apiRequest<
+          | { success: boolean; result?: { eventMarketSegments?: MarketSegment[] } }
+          | { eventMarketSegments?: MarketSegment[] }
+          | MarketSegment[]
+        >("/events/geteventmarketsegments", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<
+          | { success: boolean; result?: { eventMarketSegments?: MarketSegment[] } }
+          | { eventMarketSegments?: MarketSegment[] }
+          | MarketSegment[]
+        >("/GetEventMarketSegments", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    );
+
+    if (Array.isArray(response)) return response;
+    if (Array.isArray((response as any)?.eventMarketSegments))
+      return (response as any).eventMarketSegments;
+    if (Array.isArray((response as any)?.result?.eventMarketSegments))
+      return (response as any).result.eventMarketSegments;
+    return [];
   },
 
   // Coordinadores de cuenta
@@ -753,43 +781,88 @@ export const apiService = {
   getEventCharacters: () =>
     withFallback(
       () =>
-        apiRequest<EventCharacter[]>("/events/geteventcharacters", {
+        apiRequest<
+          | { success: boolean; result?: { eventCharacters?: EventCharacter[] } }
+          | { eventCharacters?: EventCharacter[] }
+          | EventCharacter[]
+        >("/events/geteventcharacters", {
           method: "GET",
         }),
       () =>
-        apiRequest<EventCharacter[]>("/GetEventCharacters", {
+        apiRequest<
+          | { success: boolean; result?: { eventCharacters?: EventCharacter[] } }
+          | { eventCharacters?: EventCharacter[] }
+          | EventCharacter[]
+        >("/GetEventCharacters", {
           method: "POST",
           body: buildPayload(),
         })
-    ),
+    ).then((payload) => {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray((payload as any)?.eventCharacters))
+        return (payload as any).eventCharacters;
+      if (Array.isArray((payload as any)?.result?.eventCharacters))
+        return (payload as any).result.eventCharacters;
+      return [];
+    }),
 
   // Sector del evento
   getEventSectors: () =>
     withFallback(
       () =>
-        apiRequest<EventSector[]>("/events/geteventsectors", {
+        apiRequest<
+          | { success: boolean; result?: { eventSectors?: EventSector[] } }
+          | { eventSectors?: EventSector[] }
+          | EventSector[]
+        >("/events/geteventsectors", {
           method: "GET",
         }),
       () =>
-        apiRequest<EventSector[]>("/GetEventSectors", {
+        apiRequest<
+          | { success: boolean; result?: { eventSectors?: EventSector[] } }
+          | { eventSectors?: EventSector[] }
+          | EventSector[]
+        >("/GetEventSectors", {
           method: "POST",
           body: buildPayload(),
         })
-    ),
+    ).then((payload) => {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray((payload as any)?.eventSectors))
+        return (payload as any).eventSectors;
+      if (Array.isArray((payload as any)?.result?.eventSectors))
+        return (payload as any).result.eventSectors;
+      return [];
+    }),
 
   // Tamaño del evento
   getEventSizes: () =>
     withFallback(
       () =>
-        apiRequest<EventSize[]>("/events/geteventsizes", {
+        apiRequest<
+          | { success: boolean; result?: { eventSizes?: EventSize[] } }
+          | { eventSizes?: EventSize[] }
+          | EventSize[]
+        >("/events/geteventsizes", {
           method: "GET",
         }),
       () =>
-        apiRequest<EventSize[]>("/GetEventSizes", {
+        apiRequest<
+          | { success: boolean; result?: { eventSizes?: EventSize[] } }
+          | { eventSizes?: EventSize[] }
+          | EventSize[]
+        >("/GetEventSizes", {
           method: "POST",
           body: buildPayload(),
         })
-    ),
+    ).then((payload) => {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray((payload as any)?.eventSizes))
+        return (payload as any).eventSizes;
+      if (Array.isArray((payload as any)?.result?.eventSizes))
+        return (payload as any).result.eventSizes;
+      return [];
+    }),
 
   // Tipos de reservación
   getReservationTypes: () =>
@@ -823,15 +896,30 @@ export const apiService = {
   getEventStages: () =>
     withFallback(
       () =>
-        apiRequest<EventStage[]>("/events/geteventstages", {
+        apiRequest<
+          | { success: boolean; result?: { eventStages?: EventStage[] } }
+          | { eventStages?: EventStage[] }
+          | EventStage[]
+        >("/events/geteventstages", {
           method: "GET",
         }),
       () =>
-        apiRequest<EventStage[]>("/GetEventStages", {
+        apiRequest<
+          | { success: boolean; result?: { eventStages?: EventStage[] } }
+          | { eventStages?: EventStage[] }
+          | EventStage[]
+        >("/GetEventStages", {
           method: "POST",
           body: buildPayload(),
         })
-    ),
+    ).then((payload) => {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray((payload as any)?.eventStages))
+        return (payload as any).eventStages;
+      if (Array.isArray((payload as any)?.result?.eventStages))
+        return (payload as any).result.eventStages;
+      return [];
+    }),
 
   // Tipos de actividades
   getActivityTypes: () =>
@@ -902,7 +990,10 @@ export const apiService = {
           })
       );
 
-      const subsegments = response.result?.eventMarketSubSegments || [];
+      const subsegments =
+        (response as any)?.eventMarketSubSegments ||
+        response.result?.eventMarketSubSegments ||
+        [];
       if (subsegments.length > 0) return subsegments;
     } catch (error) {
       console.warn("getEventMarketSubSegments fallo, usando segmentos", error);
