@@ -147,6 +147,8 @@ export function CrearEventoDetalle() {
   });
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [createdEventNumber, setCreatedEventNumber] = useState<number | null>(null);
   const [openSections, setOpenSections] = useState({
     general: true,
   });
@@ -701,7 +703,8 @@ export function CrearEventoDetalle() {
       setSuccessMessage(
         `Evento creado correctamente. Numero de evento: ${eventNumber}`
       );
-      route(`/eventos/${eventNumber}`);
+      setCreatedEventNumber(eventNumber);
+      setSuccessModalOpen(true);
     } catch (err) {
       console.error("Error creando evento:", err);
       setError(
@@ -914,6 +917,44 @@ export function CrearEventoDetalle() {
             </DialogBody>
             <DialogFooter>
               <Button variant="outline" onClick={() => setManagerSearchOpen(false)}>
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={successModalOpen} onOpenChange={setSuccessModalOpen}>
+          <DialogContent>
+            <DialogHeader onClose={() => setSuccessModalOpen(false)}>
+              <div>
+                <DialogTitle>Evento creado</DialogTitle>
+                <p className="text-sm text-muted-foreground">
+                  El evento se guardo correctamente.
+                </p>
+              </div>
+            </DialogHeader>
+            <DialogBody className="space-y-3">
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+                Numero de evento: <span className="font-semibold">{createdEventNumber ?? "-"}</span>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSuccessModalOpen(false);
+                  if (createdEventNumber) {
+                    route(`/eventos/${createdEventNumber}`);
+                  }
+                }}
+              >
+                Ver evento
+              </Button>
+              <Button
+                onClick={() => {
+                  setSuccessModalOpen(false);
+                }}
+              >
                 Cerrar
               </Button>
             </DialogFooter>
