@@ -7,6 +7,9 @@ interface InputProps
   value?: string | number;
   placeholder?: string;
   disabled?: boolean;
+  min?: number | string;
+  max?: number | string;
+  step?: number | string;
 }
 
 export function Input({ className, type = "text", ...props }: InputProps) {

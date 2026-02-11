@@ -572,6 +572,7 @@ export function Eventos() {
               meses para búsqueda por fechas)
             </p>
           </div>
+          <Button onClick={() => route("/eventos/crear")}>Crear evento</Button>
         </div>
 
         {/* Filtros Avanzados */}

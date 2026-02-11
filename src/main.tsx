@@ -5,6 +5,7 @@ import { Login } from "./pages/Login.tsx";
 import { Dashboard } from "./pages/Dashboard.tsx";
 import { Eventos } from "./pages/Eventos.tsx";
 import { EventoDetalle } from "./pages/EventoDetalle.tsx";
+import { CrearEventoDetalle } from "./pages/CrearEventoDetalle.tsx";
 import { Calendario } from "./pages/Calendario.tsx";
 import { Salones } from "./pages/Salones.tsx";
 import { SalonesDisponibles } from "./pages/SalonesDisponibles.tsx";
@@ -32,6 +33,8 @@ function App() {
         <Dashboard path="/dashboard" />
         {/* @ts-ignore - preact-router path prop types */}
         <Eventos path="/eventos" />
+        {/* @ts-ignore - preact-router path prop types */}
+        <CrearEventoDetalle path="/eventos/crear" />
         {/* @ts-ignore - preact-router path prop types */}
         <EventoDetalle path="/eventos/:eventNumber" />
         {/* @ts-ignore - preact-router path prop types */}

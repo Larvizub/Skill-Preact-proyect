@@ -16,7 +16,7 @@ async function apiRequest<T>(
       "Content-Type": "application/json",
       Authorization: token ? `Bearer ${token}` : "",
       // Headers requeridos por Skill Suite API
-      idData: API_CONFIG.idData,
+      idData: authService.getIdData(),
       companyAuthId: API_CONFIG.companyAuthId,
       ...options.headers,
     },
@@ -51,7 +51,7 @@ async function apiRequest<T>(
 const buildPayload = (payload: Record<string, unknown> = {}) =>
   JSON.stringify({
     companyAuthId: API_CONFIG.companyAuthId,
-    idData: API_CONFIG.idData,
+    idData: authService.getIdData(),
     ...payload,
   });
 
@@ -238,6 +238,62 @@ export interface EventCoordinator {
   id: string;
   name: string;
   email?: string;
+}
+
+export interface BillingCurrency {
+  idCurrency: number;
+  currencyName?: string;
+  currencyCode?: string;
+}
+
+export interface EventMarketSubSegment {
+  idMarketSubSegment: number;
+  marketSubSegmentName?: string;
+  marketSegmentName?: string;
+}
+
+export interface EventSubType {
+  idEventSubType: number;
+  eventSubTypeName?: string;
+  eventTypeName?: string;
+  idEventType?: number;
+}
+
+export interface EventPaymentForm {
+  idPaymentForm: number;
+  paymentFormName?: string;
+}
+
+export interface TaxExemption {
+  idTaxExemption: number;
+  taxExemptionName?: string;
+}
+
+export interface ExtraTip {
+  idExtraTip: number;
+  extraTipName?: string;
+}
+
+export interface Contingency {
+  idContingency: number;
+  contingencyName?: string;
+}
+
+export interface ClientEventManager {
+  idClientEventManager: number;
+  clientEventManagerName?: string;
+  clientEventManagerEmail?: string;
+  clientEventManagerPhone?: string;
+}
+
+export interface Resource {
+  idResource: number;
+  resourceName?: string;
+}
+
+export interface ActivityPackage {
+  idActivityPackage: number;
+  activityPackageName?: string;
 }
 
 export interface Client {
@@ -556,23 +612,33 @@ export const apiService = {
 
   // Tarifas de salones
   getRoomRates: () =>
-    apiRequest<RoomRate[]>("/GetRoomRates", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<RoomRate[]>("/events/getroomrates", {
+          method: "POST",
+          body: buildPayload(),
+        }),
+      () =>
+        apiRequest<RoomRate[]>("/GetRoomRates", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Tarifas de servicios
   getServiceRates: () =>
-    apiRequest<ServiceRate[]>("/GetServiceRates", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<ServiceRate[]>("/events/getservicerates", {
+          method: "POST",
+          body: buildPayload(),
+        }),
+      () =>
+        apiRequest<ServiceRate[]>("/GetServiceRates", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Disponibilidad de salones
   getRoomsAvailability: (startDate: string, endDate: string) =>
@@ -596,13 +662,17 @@ export const apiService = {
 
   // Tipos de eventos
   getEventTypes: () =>
-    apiRequest<EventType[]>("/GetEventTypes", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<EventType[]>("/events/geteventtypes", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<EventType[]>("/GetEventTypes", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Segmentos de mercado
   getEventMarketSegments: async () => {
@@ -649,97 +719,377 @@ export const apiService = {
 
   // Estados de eventos
   getEventStatuses: () =>
-    apiRequest<{
-      success: boolean;
-      errorCode: number;
-      result: { eventStatuses: any[] };
-    }>("/GetEventStatuses", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }).then((response) => response.result.eventStatuses),
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result: { eventStatuses: any[] } }>(
+          "/events/geteventstatuses",
+          {
+            method: "GET",
+          }
+        ),
+      () =>
+        apiRequest<{
+          success: boolean;
+          errorCode: number;
+          result: { eventStatuses: any[] };
+        }>("/GetEventStatuses", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ).then((response) => response.result.eventStatuses),
 
   // Carácter del evento
   getEventCharacters: () =>
-    apiRequest<EventCharacter[]>("/GetEventCharacters", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<EventCharacter[]>("/events/geteventcharacters", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<EventCharacter[]>("/GetEventCharacters", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Sector del evento
   getEventSectors: () =>
-    apiRequest<EventSector[]>("/GetEventSectors", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<EventSector[]>("/events/geteventsectors", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<EventSector[]>("/GetEventSectors", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Tamaño del evento
   getEventSizes: () =>
-    apiRequest<EventSize[]>("/GetEventSizes", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<EventSize[]>("/events/geteventsizes", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<EventSize[]>("/GetEventSizes", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Tipos de reservación
   getReservationTypes: () =>
-    apiRequest<ReservationType[]>("/GetReservationTypes", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<ReservationType[]>("/events/getreservationtypes", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<ReservationType[]>("/GetReservationTypes", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Usos de reservación
   getReservationUses: () =>
-    apiRequest<ReservationUse[]>("/GetReservationUses", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<ReservationUse[]>("/events/getreservationuses", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<ReservationUse[]>("/GetReservationUses", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Etapas del evento
   getEventStages: () =>
-    apiRequest<EventStage[]>("/GetEventStages", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<EventStage[]>("/events/geteventstages", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<EventStage[]>("/GetEventStages", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Tipos de actividades
   getActivityTypes: () =>
-    apiRequest<ActivityType[]>("/GetActivityTypes", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<ActivityType[]>("/events/getactivitytypes", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<ActivityType[]>("/GetActivityTypes", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
 
   // Coordinadores de eventos
   getEventCoordinators: () =>
-    apiRequest<EventCoordinator[]>("/GetEventCoordinators", {
-      method: "POST",
-      body: JSON.stringify({
-        companyAuthId: API_CONFIG.companyAuthId,
-        idData: API_CONFIG.idData,
-      }),
-    }),
+    withFallback(
+      () =>
+        apiRequest<EventCoordinator[]>("/events/geteventcoordinators", {
+          method: "GET",
+        }),
+      () =>
+        apiRequest<EventCoordinator[]>("/GetEventCoordinators", {
+          method: "POST",
+          body: buildPayload(),
+        })
+    ),
+
+  // Monedas de facturacion
+  getBillingCurrencies: () =>
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result?: { billingCurrencies?: BillingCurrency[] } }>(
+          "/events/getbillingcurrency",
+          {
+            method: "GET",
+          }
+        ),
+      () =>
+        apiRequest<{ success: boolean; result?: { billingCurrencies?: BillingCurrency[] } }>(
+          "/GetBillingCurrency",
+          {
+            method: "POST",
+            body: buildPayload(),
+          }
+        )
+    ).then((response) => response.result?.billingCurrencies || []),
+
+  // Subsegmentos de mercado
+  getEventMarketSubSegments: async () => {
+    try {
+      const response = await withFallback(
+        () =>
+          apiRequest<{
+            success: boolean;
+            result?: { eventMarketSubSegments?: EventMarketSubSegment[] };
+          }>("/events/geteventmarketsubsegments", {
+            method: "GET",
+          }),
+        () =>
+          apiRequest<{
+            success: boolean;
+            result?: { eventMarketSubSegments?: EventMarketSubSegment[] };
+          }>("/GetEventMarketSubSegments", {
+            method: "POST",
+            body: buildPayload(),
+          })
+      );
+
+      const subsegments = response.result?.eventMarketSubSegments || [];
+      if (subsegments.length > 0) return subsegments;
+    } catch (error) {
+      console.warn("getEventMarketSubSegments fallo, usando segmentos", error);
+    }
+
+    const segments = await apiService.getEventMarketSegments();
+    return segments.map((segment) => ({
+      idMarketSubSegment: Number(segment.id),
+      marketSubSegmentName: segment.name,
+      marketSegmentName: segment.name,
+    }));
+  },
+
+  // Subtipos de evento
+  getEventSubTypes: async () => {
+    try {
+      const response = await withFallback(
+        () =>
+          apiRequest<{
+            success: boolean;
+            result?: { eventSubTypes?: EventSubType[] };
+          }>("/events/geteventsubtypes", {
+            method: "GET",
+          }),
+        () =>
+          apiRequest<{
+            success: boolean;
+            result?: { eventSubTypes?: EventSubType[] };
+          }>("/GetEventSubTypes", {
+            method: "POST",
+            body: buildPayload(),
+          })
+      );
+
+      const subTypes = response.result?.eventSubTypes || [];
+      if (subTypes.length > 0) return subTypes;
+    } catch (error) {
+      console.warn("getEventSubTypes fallo, usando event types", error);
+    }
+
+    const types = await apiService.getEventTypes();
+    return (types || [])
+      .map((type: any) => ({
+        idEventSubType: Number(
+          type.idEventSubType ?? type.idEventType ?? type.id ?? 0
+        ),
+        eventSubTypeName:
+          type.eventSubTypeName ?? type.eventTypeName ?? type.name,
+        eventTypeName: type.eventTypeName ?? type.name,
+        idEventType: type.idEventType ?? type.id,
+      }))
+      .filter((entry: EventSubType) => entry.idEventSubType > 0);
+  },
+
+  // Formas de pago
+  getEventPaymentForms: () =>
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result?: { paymentForms?: EventPaymentForm[] } }>(
+          "/events/geteventpaymentforms",
+          {
+            method: "GET",
+          }
+        ),
+      () =>
+        apiRequest<{ success: boolean; result?: { paymentForms?: EventPaymentForm[] } }>(
+          "/GetEventPaymentForms",
+          {
+            method: "POST",
+            body: buildPayload(),
+          }
+        )
+    ).then((response) => response.result?.paymentForms || []),
+
+  // Exenciones de impuestos
+  getTaxExemptions: () =>
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result?: { taxExemptions?: TaxExemption[] } }>(
+          "/events/gettaxexemptions",
+          {
+            method: "GET",
+          }
+        ),
+      () =>
+        apiRequest<{ success: boolean; result?: { taxExemptions?: TaxExemption[] } }>(
+          "/GetTaxExemptions",
+          {
+            method: "POST",
+            body: buildPayload(),
+          }
+        )
+    ).then((response) => response.result?.taxExemptions || []),
+
+  // Propinas extra
+  getExtraTips: () =>
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result?: { extraTips?: ExtraTip[] } }>(
+          "/events/getextratip",
+          {
+            method: "GET",
+          }
+        ),
+      () =>
+        apiRequest<{ success: boolean; result?: { extraTips?: ExtraTip[] } }>(
+          "/GetExtraTip",
+          {
+            method: "POST",
+            body: buildPayload(),
+          }
+        )
+    ).then((response) => response.result?.extraTips || []),
+
+  // Imprevistos
+  getContingencies: () =>
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result?: { contingencies?: Contingency[] } }>(
+          "/events/getcontingencies",
+          {
+            method: "GET",
+          }
+        ),
+      () =>
+        apiRequest<{ success: boolean; result?: { contingencies?: Contingency[] } }>(
+          "/GetContingencies",
+          {
+            method: "POST",
+            body: buildPayload(),
+          }
+        )
+    ).then((response) => response.result?.contingencies || []),
+
+  // Responsables del evento del lado del cliente
+  getClientEventManagers: (idClient?: number) =>
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result?: { clientEventManagers?: ClientEventManager[] } }>(
+          "/events/getclienteventmanagers",
+          {
+            method: "POST",
+            body: buildPayload({
+              idClient: idClient ?? null,
+            }),
+          }
+        ),
+      () =>
+        apiRequest<{ success: boolean; result?: { clientEventManagers?: ClientEventManager[] } }>(
+          "/GetClientEventManagers",
+          {
+            method: "POST",
+            body: buildPayload({
+              idClient: idClient ?? null,
+            }),
+          }
+        )
+    ).then((response) => response.result?.clientEventManagers || []),
+
+  // Recursos
+  getResources: () =>
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result?: { resources?: Resource[] } }>(
+          "/events/getresources",
+          {
+            method: "GET",
+          }
+        ),
+      () =>
+        apiRequest<{ success: boolean; result?: { resources?: Resource[] } }>(
+          "/GetResources",
+          {
+            method: "POST",
+            body: buildPayload(),
+          }
+        )
+    ).then((response) => response.result?.resources || []),
+
+  // Paquetes de actividad
+  getActivityPackages: () =>
+    withFallback(
+      () =>
+        apiRequest<{ success: boolean; result?: { activityPackages?: ActivityPackage[] } }>(
+          "/events/getactivitypackages",
+          {
+            method: "GET",
+          }
+        ),
+      () =>
+        apiRequest<{ success: boolean; result?: { activityPackages?: ActivityPackage[] } }>(
+          "/GetActivityPackages",
+          {
+            method: "POST",
+            body: buildPayload(),
+          }
+        )
+    ).then((response) => response.result?.activityPackages || []),
 
   // Calendarios
   getSchedules: (
@@ -772,6 +1122,63 @@ export const apiService = {
       }
     ).then((response) => response.result?.schedules || []);
   },
+
+  // Crear evento
+  createEvent: async (eventPayload: Record<string, unknown>) =>
+    apiRequest<{ success: boolean; result?: { eventNumber?: number } }>(
+      "/events/event",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          Event: eventPayload,
+        }),
+      }
+    ),
+
+  // Crear actividad dentro de un evento
+  addEventActivity: async (
+    eventNumber: number,
+    activityPayload: Record<string, unknown>
+  ) =>
+    apiRequest<{ success: boolean; result?: { idEventActivity?: number } }>(
+      `/events/event/${eventNumber}/activity`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          Activity: activityPayload,
+        }),
+      }
+    ),
+
+  // Reservar salon a una actividad
+  addActivityRoom: async (
+    idEventActivity: number,
+    roomPayload: Record<string, unknown>
+  ) =>
+    apiRequest<{ success: boolean; result?: { idActivityRoom?: number } }>(
+      `/events/event/activity/${idEventActivity}/room`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          room: roomPayload,
+        }),
+      }
+    ),
+
+  // Agregar servicio a una actividad
+  addActivityService: async (
+    idEventActivity: number,
+    servicePayload: Record<string, unknown>
+  ) =>
+    apiRequest<{ success: boolean; result?: { idActivityService?: number } }>(
+      `/events/event/activity/${idEventActivity}/service`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          Service: servicePayload,
+        }),
+      }
+    ),
 
   // Eventos
   // Optimización: soporta búsqueda directa por ID y nombre usando parámetros de la API

@@ -17,7 +17,8 @@ const RECINTO_ID_DATA: Record<Recinto, string> = {
 
 const storedRecinto = (localStorage.getItem("skill_recinto") ||
   "CCCR") as Recinto;
-const initialIdData = RECINTO_ID_DATA[storedRecinto] || "14";
+const storedIdData = localStorage.getItem("skill_id_data");
+const initialIdData = storedIdData || RECINTO_ID_DATA[storedRecinto] || "14";
 
 export const API_CONFIG = {
   baseURL: resolvedBaseURL,
@@ -97,6 +98,10 @@ class AuthService {
     API_CONFIG.idData = RECINTO_ID_DATA[recinto];
     localStorage.setItem("skill_recinto", recinto);
     localStorage.setItem("skill_id_data", API_CONFIG.idData);
+  }
+
+  getIdData(): string {
+    return localStorage.getItem("skill_id_data") || API_CONFIG.idData;
   }
 
   getToken(): string | null {
