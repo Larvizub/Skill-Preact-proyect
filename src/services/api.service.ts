@@ -267,6 +267,7 @@ export interface EventSubType {
 export interface EventPaymentForm {
   idPaymentForm: number;
   paymentFormName?: string;
+  paymentFormDescription?: string;
 }
 
 export interface TaxExemption {
@@ -277,6 +278,7 @@ export interface TaxExemption {
 export interface ExtraTip {
   idExtraTip: number;
   extraTipName?: string;
+  extraTipDescription?: string;
 }
 
 export interface Contingency {
@@ -859,8 +861,12 @@ export const apiService = {
       if (Array.isArray(payload)) return payload;
       if (Array.isArray((payload as any)?.eventSizes))
         return (payload as any).eventSizes;
+      if (Array.isArray((payload as any)?.eventSize))
+        return (payload as any).eventSize;
       if (Array.isArray((payload as any)?.result?.eventSizes))
         return (payload as any).result.eventSizes;
+      if (Array.isArray((payload as any)?.result?.eventSize))
+        return (payload as any).result.eventSize;
       return [];
     }),
 
@@ -893,33 +899,44 @@ export const apiService = {
     ),
 
   // Etapas del evento
-  getEventStages: () =>
-    withFallback(
-      () =>
-        apiRequest<
-          | { success: boolean; result?: { eventStages?: EventStage[] } }
-          | { eventStages?: EventStage[] }
-          | EventStage[]
-        >("/events/geteventstages", {
-          method: "GET",
-        }),
-      () =>
-        apiRequest<
-          | { success: boolean; result?: { eventStages?: EventStage[] } }
-          | { eventStages?: EventStage[] }
-          | EventStage[]
-        >("/GetEventStages", {
-          method: "POST",
-          body: buildPayload(),
-        })
-    ).then((payload) => {
+  getEventStages: async () => {
+    const extractStages = (payload: any): EventStage[] => {
       if (Array.isArray(payload)) return payload;
-      if (Array.isArray((payload as any)?.eventStages))
-        return (payload as any).eventStages;
-      if (Array.isArray((payload as any)?.result?.eventStages))
-        return (payload as any).result.eventStages;
+      if (Array.isArray(payload?.eventStages)) return payload.eventStages;
+      if (Array.isArray(payload?.eventStage)) return payload.eventStage;
+      if (Array.isArray(payload?.result?.eventStages))
+        return payload.result.eventStages;
+      if (Array.isArray(payload?.result?.eventStage))
+        return payload.result.eventStage;
       return [];
-    }),
+    };
+
+    try {
+      const getPayload = await apiRequest<
+        | { success: boolean; result?: { eventStages?: EventStage[] } }
+        | { eventStages?: EventStage[] }
+        | EventStage[]
+      >("/events/geteventstages", {
+        method: "GET",
+      });
+
+      const stages = extractStages(getPayload);
+      if (stages.length > 0) return stages;
+    } catch (error) {
+      console.warn("getEventStages GET fallo", error);
+    }
+
+    const postPayload = await apiRequest<
+      | { success: boolean; result?: { eventStages?: EventStage[] } }
+      | { eventStages?: EventStage[] }
+      | EventStage[]
+    >("/GetEventStages", {
+      method: "POST",
+      body: buildPayload(),
+    });
+
+    return extractStages(postPayload);
+  },
 
   // Tipos de actividades
   getActivityTypes: () =>
@@ -1000,7 +1017,7 @@ export const apiService = {
     }
 
     const segments = await apiService.getEventMarketSegments();
-    return segments.map((segment) => ({
+    return segments.map((segment: MarketSegment) => ({
       idMarketSubSegment: Number(segment.id),
       marketSubSegmentName: segment.name,
       marketSegmentName: segment.name,
@@ -1080,7 +1097,15 @@ export const apiService = {
             body: buildPayload(),
           }
         )
-    ).then((response) => response.result?.paymentForms || []),
+    ).then((response) =>
+      (response.result?.paymentForms || []).map((form) => ({
+        ...form,
+        paymentFormName:
+          form.paymentFormName ||
+          form.paymentFormDescription ||
+          "",
+      }))
+    ),
 
   // Exenciones de impuestos
   getTaxExemptions: () =>
@@ -1103,24 +1128,70 @@ export const apiService = {
     ).then((response) => response.result?.taxExemptions || []),
 
   // Propinas extra
-  getExtraTips: () =>
-    withFallback(
-      () =>
-        apiRequest<{ success: boolean; result?: { extraTips?: ExtraTip[] } }>(
-          "/events/getextratip",
-          {
-            method: "GET",
-          }
-        ),
-      () =>
-        apiRequest<{ success: boolean; result?: { extraTips?: ExtraTip[] } }>(
-          "/GetExtraTip",
-          {
-            method: "POST",
-            body: buildPayload(),
-          }
-        )
-    ).then((response) => response.result?.extraTips || []),
+  getExtraTips: async () => {
+    const normalizeTips = (response: any) => {
+      const result = response?.result ?? response ?? {};
+      const rawTips =
+        result?.extraTips ||
+        result?.extraTip ||
+        result?.extraTipList ||
+        result?.extraTipData ||
+        result?.extraTipsList ||
+        [];
+      const tips = Array.isArray(rawTips)
+        ? rawTips
+        : rawTips?.extraTips || rawTips?.extraTip || [];
+
+      return (tips || []).map((tip: any) => ({
+        ...tip,
+        idExtraTip:
+          tip.idExtraTip ??
+          tip.idExtraTipType ??
+          tip.id ??
+          0,
+        extraTipName:
+          tip.extraTipName ||
+          tip.extraTipDescription ||
+          tip.description ||
+          "",
+      }));
+    };
+
+    const primaryResponse = await apiRequest<{
+      success: boolean;
+      result?: { extraTips?: ExtraTip[] };
+    }>("/events/getextratips", {
+      method: "GET",
+    });
+
+    const primaryTips = normalizeTips(primaryResponse);
+    if (primaryTips.length > 0) return primaryTips;
+
+    const tryFallback = async (endpoint: string) => {
+      const response = await apiRequest<{
+        success: boolean;
+        result?: { extraTips?: ExtraTip[] };
+      }>(endpoint, {
+        method: "POST",
+        body: buildPayload(),
+      });
+      return normalizeTips(response);
+    };
+
+    try {
+      const pluralPost = await tryFallback("/GetExtraTips");
+      if (pluralPost.length > 0) return pluralPost;
+    } catch (error) {
+      console.warn("getExtraTips fallback plural fallo", error);
+    }
+
+    try {
+      return await tryFallback("/GetExtraTip");
+    } catch (error) {
+      console.warn("getExtraTips fallback singular fallo", error);
+      return primaryTips;
+    }
+  },
 
   // Imprevistos
   getContingencies: () =>

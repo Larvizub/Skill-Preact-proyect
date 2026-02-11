@@ -28,7 +28,6 @@ import {
   type Client,
   type ClientEventManager,
   type Contingency,
-  type EventCoordinator,
   type EventMarketSubSegment,
   type EventPaymentForm,
   type EventSector,
@@ -80,11 +79,11 @@ interface EventFormState {
   contingenciesAmount: string;
   personalContract: boolean;
   contractAlreadySigned: boolean;
-  signatureDate: string;
-  billingName: string;
+  signatureDate: string; // Eliminar logica
+  billingName: string; // Eliminar logica
   quoteExpirationDate: string;
   standsQuantity: string;
-  idCreationOper: string;
+  idCreationOper: string; 
   idEventStage: string;
   sustainable: boolean;
   icca: boolean;
@@ -284,16 +283,24 @@ export function CrearEventoDetalle() {
     createEmptyActivity(),
   ]);
   const [loading, setLoading] = useState(false);
-  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [loadingSections, setLoadingSections] = useState({
+    general: true,
+    activities: false,
+  });
+  const [loadedSections, setLoadedSections] = useState({
+    general: false,
+    activities: false,
+  });
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState({
     general: true,
-    billing: false,
     activities: false,
   });
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [managerSearchOpen, setManagerSearchOpen] = useState(false);
+  const [managerSearchQuery, setManagerSearchQuery] = useState("");
 
   const [clients, setClients] = useState<Client[]>([]);
   const [salesAgents, setSalesAgents] = useState<SalesAgent[]>([]);
@@ -307,15 +314,9 @@ export function CrearEventoDetalle() {
   const [sectors, setSectors] = useState<EventSector[]>([]);
   const [sizes, setSizes] = useState<EventSize[]>([]);
   const [paymentForms, setPaymentForms] = useState<EventPaymentForm[]>([]);
-  const [eventStages, setEventStages] = useState<{ id: string; name: string }[]>(
-    []
-  );
   const [taxExemptions, setTaxExemptions] = useState<TaxExemption[]>([]);
   const [extraTips, setExtraTips] = useState<ExtraTip[]>([]);
   const [contingencies, setContingencies] = useState<Contingency[]>([]);
-  const [eventCoordinators, setEventCoordinators] = useState<
-    EventCoordinator[]
-  >([]);
   const [clientManagers, setClientManagers] = useState<ClientEventManager[]>(
     []
   );
@@ -333,41 +334,27 @@ export function CrearEventoDetalle() {
   const [services, setServices] = useState<Service[]>([]);
   const [activityPackages, setActivityPackages] = useState<ActivityPackage[]>([]);
 
-  useEffect(() => {
-    if (!loadingOptions) return;
-    const timer = setTimeout(() => {
-      setLoadingOptions(false);
-      setError((prev) =>
-        prev ??
-          "Algunos parametros tardaron demasiado en cargar. Revisa la conexion o el API."
-      );
-    }, 20000);
+  const loadSection = async (section: "general" | "activities") => {
+    setLoadingSections((prev) => ({ ...prev, [section]: true }));
 
-    return () => clearTimeout(timer);
-  }, [loadingOptions]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadOptions = async () => {
-      setLoadingOptions(true);
+    const safeLoad = async <T,>(
+      label: string,
+      loader: () => Promise<T>,
+      fallback: T
+    ): Promise<T> => {
       try {
-        const safeLoad = async <T,>(
-          label: string,
-          loader: () => Promise<T>,
-          fallback: T
-        ): Promise<T> => {
-          try {
-            const timeoutPromise = new Promise<T>((_resolve, reject) =>
-              setTimeout(() => reject(new Error("timeout")), 15000)
-            );
-            return await Promise.race([loader(), timeoutPromise]);
-          } catch (err) {
-            console.warn(`loadOptions: ${label} fallo`, err);
-            return fallback;
-          }
-        };
+        const timeoutPromise = new Promise<T>((_resolve, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 15000)
+        );
+        return await Promise.race([loader(), timeoutPromise]);
+      } catch (err) {
+        console.warn(`loadOptions: ${label} fallo`, err);
+        return fallback;
+      }
+    };
 
+    try {
+      if (section === "general") {
         const [
           clientData,
           salesData,
@@ -379,24 +366,17 @@ export function CrearEventoDetalle() {
           sectorData,
           sizeData,
           paymentData,
-          stageData,
           taxData,
           extraTipData,
           contingencyData,
-          coordinatorData,
-          activityTypeData,
-          statusData,
-          resourceData,
-          reservationTypeData,
-          reservationUseData,
-          roomData,
-          roomRateData,
-          serviceData,
-          activityPackageData,
         ] = await Promise.all([
           safeLoad("clients", () => apiService.getClients(), []),
           safeLoad("salesAgents", () => apiService.getSalesAgents(), []),
-          safeLoad("eventMarketSegments", () => apiService.getEventMarketSegments(), []),
+          safeLoad(
+            "eventMarketSegments",
+            () => apiService.getEventMarketSegments(),
+            []
+          ),
           safeLoad(
             "eventMarketSubSegments",
             () => apiService.getEventMarketSubSegments(),
@@ -407,24 +387,15 @@ export function CrearEventoDetalle() {
           safeLoad("eventCharacters", () => apiService.getEventCharacters(), []),
           safeLoad("eventSectors", () => apiService.getEventSectors(), []),
           safeLoad("eventSizes", () => apiService.getEventSizes(), []),
-          safeLoad("eventPaymentForms", () => apiService.getEventPaymentForms(), []),
-          safeLoad("eventStages", () => apiService.getEventStages(), []),
+          safeLoad(
+            "eventPaymentForms",
+            () => apiService.getEventPaymentForms(),
+            []
+          ),
           safeLoad("taxExemptions", () => apiService.getTaxExemptions(), []),
           safeLoad("extraTips", () => apiService.getExtraTips(), []),
           safeLoad("contingencies", () => apiService.getContingencies(), []),
-          safeLoad("eventCoordinators", () => apiService.getEventCoordinators(), []),
-          safeLoad("activityTypes", () => apiService.getActivityTypes(), []),
-          safeLoad("eventStatuses", () => apiService.getEventStatuses(), []),
-          safeLoad("resources", () => apiService.getResources(), []),
-          safeLoad("reservationTypes", () => apiService.getReservationTypes(), []),
-          safeLoad("reservationUses", () => apiService.getReservationUses(), []),
-          safeLoad("rooms", () => apiService.getRooms(), []),
-          safeLoad("roomRates", () => apiService.getRoomRates(), []),
-          safeLoad("services", () => apiService.getServices(), []),
-          safeLoad("activityPackages", () => apiService.getActivityPackages(), []),
         ]);
-
-        if (!isMounted) return;
 
         const derivedSubsegments = (segmentData || []).flatMap((segment: any) =>
           (segment.marketSubSegments || segment.eventMarketSubSegments || []).map(
@@ -449,7 +420,9 @@ export function CrearEventoDetalle() {
         setEventTypes(eventTypeData || []);
         setSegments(segmentData || []);
         setSubsegments(
-          derivedSubsegments.length > 0 ? derivedSubsegments : subsegmentData || []
+          derivedSubsegments.length > 0
+            ? derivedSubsegments
+            : subsegmentData || []
         );
         setSubtypes(subtypeData || []);
         setCharacters(
@@ -461,16 +434,50 @@ export function CrearEventoDetalle() {
         setSectors(sectorData || []);
         setSizes(sizeData || []);
         setPaymentForms(paymentData || []);
-        setEventStages(
-          (stageData || []).map((item: any) => ({
-            id: String(item.id ?? item.idEventStage ?? ""),
-            name: item.name ?? item.eventStageName ?? "",
-          }))
-        );
         setTaxExemptions(taxData || []);
         setExtraTips(extraTipData || []);
         setContingencies(contingencyData || []);
-        setEventCoordinators(coordinatorData || []);
+
+        if (clientData.length === 0 || salesData.length === 0) {
+          setError(
+            "Algunos parametros clave no se pudieron cargar. Revisa la conexion o el API."
+          );
+        } else {
+          setError(null);
+        }
+      }
+
+      if (section === "activities") {
+        const [
+          activityTypeData,
+          statusData,
+          resourceData,
+          reservationTypeData,
+          reservationUseData,
+          roomData,
+          roomRateData,
+          serviceData,
+          activityPackageData,
+        ] = await Promise.all([
+          safeLoad("activityTypes", () => apiService.getActivityTypes(), []),
+          safeLoad("eventStatuses", () => apiService.getEventStatuses(), []),
+          safeLoad("resources", () => apiService.getResources(), []),
+          safeLoad(
+            "reservationTypes",
+            () => apiService.getReservationTypes(),
+            []
+          ),
+          safeLoad("reservationUses", () => apiService.getReservationUses(), []),
+          safeLoad("rooms", () => apiService.getRooms(), []),
+          safeLoad("roomRates", () => apiService.getRoomRates(), []),
+          safeLoad("services", () => apiService.getServices(), []),
+          safeLoad(
+            "activityPackages",
+            () => apiService.getActivityPackages(),
+            []
+          ),
+        ]);
+
         setActivityTypes(
           (activityTypeData || []).map((item: any) => ({
             id: String(item.id ?? item.idActivityType ?? ""),
@@ -490,37 +497,36 @@ export function CrearEventoDetalle() {
         setRoomRates(roomRateData || []);
         setServices(serviceData || []);
         setActivityPackages(activityPackageData || []);
-
-        if (
-          clientData.length === 0 ||
-          salesData.length === 0
-        ) {
-          setError(
-            "Algunos parametros clave no se pudieron cargar. Revisa la conexion o el API."
-          );
-        } else {
-          setError(null);
-        }
-      } catch (err) {
-        console.error("Error cargando opciones del formulario:", err);
-        if (isMounted) {
-          setError(
-            "No se pudieron cargar los datos de referencia. Verifica la conexion e intenta nuevamente."
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setLoadingOptions(false);
-        }
       }
-    };
 
-    loadOptions();
+      setLoadedSections((prev) => ({ ...prev, [section]: true }));
+    } catch (err) {
+      console.error("Error cargando opciones del formulario:", err);
+      setError(
+        "No se pudieron cargar los datos de referencia. Verifica la conexion e intenta nuevamente."
+      );
+    } finally {
+      setLoadingSections((prev) => ({ ...prev, [section]: false }));
+    }
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    loadSection("general");
   }, []);
+
+  useEffect(() => {
+    if (
+      openSections.activities &&
+      !loadedSections.activities &&
+      !loadingSections.activities
+    ) {
+      loadSection("activities");
+    }
+  }, [
+    openSections.activities,
+    loadedSections.activities,
+    loadingSections.activities,
+  ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -585,6 +591,106 @@ export function CrearEventoDetalle() {
       })),
     [services]
   );
+
+  const sizeIdByLabel = useMemo(() => {
+    const normalize = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .replace(/[^A-Za-z0-9]+/g, "")
+        .toUpperCase()
+        .trim();
+
+    const resolveSizeCode = (raw: string) => {
+      const name = normalize(raw);
+      if (!name) return "";
+      if (
+        name.includes("XS") ||
+        name.includes("XSMALL") ||
+        name.includes("EXTRASMALL") ||
+        name.includes("EXTRAPEQUENO") ||
+        name.includes("EXTRAPEQUEN")
+      )
+        return "XS";
+      if (
+        name.includes("XL") ||
+        name.includes("XLARGE") ||
+        name.includes("EXTRALARGE") ||
+        name.includes("EXTRAGRANDE")
+      )
+        return "XL";
+      if (
+        name.includes("SMALL") ||
+        name.includes("PEQUENO") ||
+        name.includes("PEQUEN")
+      )
+        return "S";
+      if (name.includes("MEDIUM") || name.includes("MEDIANO")) return "M";
+      if (name.includes("LARGE") || name.includes("GRANDE")) return "L";
+      if (name === "S" || name === "M" || name === "L") return name;
+      return "";
+    };
+
+    const map = new Map<string, string>();
+    sizes.forEach((size: any) => {
+      const id = String(size.id ?? size.idEventSize ?? "");
+      const name = String(size.name ?? size.eventSizeName ?? "");
+      const code = resolveSizeCode(name);
+      if (id && code) {
+        map.set(code, id);
+      }
+    });
+    return map;
+  }, [sizes]);
+
+  const sizeRanges = useMemo(() => {
+    const normalize = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .toUpperCase();
+
+    return sizes
+      .map((size: any) => {
+        const id = String(size.id ?? size.idEventSize ?? "");
+        const name = String(size.name ?? size.eventSizeName ?? "");
+        if (!id || !name) return null;
+
+        const raw = normalize(name);
+        const numbers = raw.match(/\d+/g)?.map(Number) || [];
+        const hasPlus =
+          raw.includes("+") ||
+          raw.includes("MAS") ||
+          raw.includes("ADELANTE") ||
+          raw.includes("MAYOR") ||
+          raw.includes("DESDE") ||
+          raw.includes("MINIMO");
+        const hasUpperBound =
+          raw.includes("HASTA") ||
+          raw.includes("MENOS") ||
+          raw.includes("MAX") ||
+          raw.includes("MAXIMO");
+
+        if (numbers.length >= 2) {
+          const min = Math.min(numbers[0], numbers[1]);
+          const max = Math.max(numbers[0], numbers[1]);
+          return { id, min, max };
+        }
+
+        if (numbers.length === 1 && hasUpperBound) {
+          return { id, min: 0, max: numbers[0] };
+        }
+
+        if (numbers.length === 1 && hasPlus) {
+          return { id, min: numbers[0], max: Number.POSITIVE_INFINITY };
+        }
+
+        return null;
+      })
+      .filter((entry): entry is { id: string; min: number; max: number } =>
+        Boolean(entry)
+      );
+  }, [sizes]);
 
 
   const segmentOptions = useMemo(() => {
@@ -745,6 +851,34 @@ export function CrearEventoDetalle() {
       updateEventField("idEventSubtype", "");
     }
   }, [eventState.idEventType, eventState.idEventSubtype, filteredSubtypes]);
+
+  useEffect(() => {
+    const pax = Number(eventState.estimatedPax);
+    if (Number.isNaN(pax)) return;
+
+    let sizeLabel = "";
+    if (pax >= 0 && pax <= 100) sizeLabel = "XS";
+    else if (pax >= 101 && pax <= 500) sizeLabel = "S";
+    else if (pax >= 501 && pax <= 1500) sizeLabel = "M";
+    else if (pax >= 1501 && pax <= 2500) sizeLabel = "L";
+    else if (pax >= 2501) sizeLabel = "XL";
+
+    let sizeId = sizeIdByLabel.get(sizeLabel) || "";
+    if (!sizeId && sizeRanges.length > 0) {
+      const match = sizeRanges.find(
+        (range) => pax >= range.min && pax <= range.max
+      );
+      sizeId = match?.id || "";
+    }
+    if (sizeId && sizeId !== eventState.idEventSize) {
+      updateEventField("idEventSize", sizeId);
+    }
+  }, [
+    eventState.estimatedPax,
+    eventState.idEventSize,
+    sizeIdByLabel,
+    sizeRanges,
+  ]);
   const updateEventField = (
     field: keyof EventFormState,
     value: string | boolean
@@ -1193,8 +1327,103 @@ export function CrearEventoDetalle() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={managerSearchOpen} onOpenChange={setManagerSearchOpen}>
+          <DialogContent>
+            <DialogHeader onClose={() => setManagerSearchOpen(false)}>
+              <div>
+                <DialogTitle>Buscar responsable</DialogTitle>
+                <p className="text-sm text-muted-foreground">
+                  Selecciona el responsable de cuenta para el evento.
+                </p>
+              </div>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={managerSearchQuery}
+                  onInput={(e) =>
+                    setManagerSearchQuery(
+                      (e.target as HTMLInputElement).value
+                    )
+                  }
+                  placeholder="Buscar por nombre, correo o ID"
+                />
+                <Button variant="outline" size="icon" aria-label="Buscar">
+                  <Search className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="max-h-[360px] overflow-y-auto space-y-2">
+                {clientManagers
+                  .filter((manager) => {
+                    const query = managerSearchQuery.trim().toLowerCase();
+                    if (!query) return true;
+                    const name = manager.clientEventManagerName || "";
+                    const email = manager.clientEventManagerEmail || "";
+                    const phone = manager.clientEventManagerPhone || "";
+                    const id = manager.idClientEventManager
+                      ? String(manager.idClientEventManager)
+                      : "";
+                    return (
+                      name.toLowerCase().includes(query) ||
+                      email.toLowerCase().includes(query) ||
+                      phone.toLowerCase().includes(query) ||
+                      id.includes(query)
+                    );
+                  })
+                  .slice(0, 100)
+                  .map((manager) => (
+                    <button
+                      key={
+                        manager.idClientEventManager ??
+                        manager.clientEventManagerEmail ??
+                        manager.clientEventManagerName
+                      }
+                      className="w-full rounded-md border border-border p-3 text-left hover:bg-accent transition-colors"
+                      onClick={() => {
+                        updateEventField(
+                          "idClientEventManager",
+                          String(manager.idClientEventManager ?? "")
+                        );
+                        setManagerSearchOpen(false);
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {manager.clientEventManagerName ||
+                              manager.clientEventManagerEmail ||
+                              "Responsable"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {manager.clientEventManagerEmail || ""}
+                            {manager.idClientEventManager
+                              ? ` #${manager.idClientEventManager}`
+                              : ""}
+                          </p>
+                        </div>
+                        <span className="text-xs text-primary">Seleccionar</span>
+                      </div>
+                    </button>
+                  ))}
+
+                {clientManagers.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No hay responsables disponibles.
+                  </p>
+                )}
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setManagerSearchOpen(false)}>
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <div className="space-y-6">
-          {loadingOptions && (
+          {loadingSections.general && (
             <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
               <Spinner size="sm" />
               <span className="text-muted-foreground">
@@ -1335,6 +1564,39 @@ export function CrearEventoDetalle() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">PAX estimado</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={eventState.estimatedPax}
+                      onInput={(e) =>
+                        updateEventField(
+                          "estimatedPax",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Cantidad estimada"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">PAX real</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={eventState.realPax}
+                      onInput={(e) =>
+                        updateEventField(
+                          "realPax",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Cantidad real"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Segmento</label>
@@ -1470,6 +1732,41 @@ export function CrearEventoDetalle() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Responsable de la Cuenta
+                    </label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Select
+                        className="flex-1"
+                        value={eventState.idClientEventManager}
+                        onChange={(e) =>
+                          updateEventField(
+                            "idClientEventManager",
+                            (e.target as HTMLSelectElement).value
+                          )
+                        }
+                      >
+                        <option value="">Selecciona responsable</option>
+                        {clientManagers.map((manager) => (
+                          <option
+                            key={manager.idClientEventManager}
+                            value={String(manager.idClientEventManager)}
+                          >
+                            {manager.clientEventManagerName ||
+                              manager.clientEventManagerEmail ||
+                              "Responsable"}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        variant="outline"
+                        onClick={() => setManagerSearchOpen(true)}
+                      >
+                        Buscar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-sm font-medium">Tamaño</label>
                     <Select
                       value={eventState.idEventSize}
@@ -1492,23 +1789,145 @@ export function CrearEventoDetalle() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Etapa</label>
+                    <label className="text-sm font-medium">
+                      Fecha vencimiento cotizacion
+                    </label>
+                    <DatePicker
+                      value={eventState.quoteExpirationDate}
+                      onInput={(e) =>
+                        updateEventField(
+                          "quoteExpirationDate",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Impuestos</label>
                     <Select
-                      value={eventState.idEventStage}
+                      value={eventState.idExemption}
                       onChange={(e) =>
                         updateEventField(
-                          "idEventStage",
+                          "idExemption",
                           (e.target as HTMLSelectElement).value
                         )
                       }
                     >
-                      <option value="">Selecciona etapa</option>
-                      {eventStages.map((stage) => (
-                        <option key={stage.id} value={stage.id}>
-                          {stage.name}
+                      <option value="">Selecciona impuestos</option>
+                      {taxExemptions.map((ex) => (
+                        <option
+                          key={ex.idTaxExemption}
+                          value={String(ex.idTaxExemption)}
+                        >
+                          {ex.taxExemptionName}
                         </option>
                       ))}
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Imprevisto</label>
+                    <Select
+                      value={eventState.idContingency}
+                      onChange={(e) =>
+                        updateEventField(
+                          "idContingency",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona imprevisto</option>
+                      {contingencies.map((cont) => (
+                        <option
+                          key={cont.idContingency}
+                          value={String(cont.idContingency)}
+                        >
+                          {cont.contingencyName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Propina</label>
+                    <Select
+                      value={eventState.idExtraTip}
+                      onChange={(e) =>
+                        updateEventField(
+                          "idExtraTip",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona propina</option>
+                      {extraTips.map((tip) => (
+                        <option
+                          key={tip.idExtraTip}
+                          value={String(tip.idExtraTip)}
+                        >
+                          {tip.extraTipName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Forma de pago</label>
+                    <Select
+                      value={eventState.idEventPaymentForm}
+                      onChange={(e) =>
+                        updateEventField(
+                          "idEventPaymentForm",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona forma de pago</option>
+                      {paymentForms.map((form) => (
+                        <option
+                          key={form.idPaymentForm}
+                          value={String(form.idPaymentForm)}
+                        >
+                          {form.paymentFormName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Evento repetitivo</label>
+                    <div className="flex h-10 items-center gap-3 rounded-md border border-slate-200/70 bg-slate-50 px-3 text-sm shadow-sm dark:border-slate-800/70 dark:bg-slate-900/40">
+                      <input
+                        type="checkbox"
+                        className="accent-slate-600"
+                        checked={eventState.repetitiveEvent}
+                        onChange={(e) =>
+                          updateEventField(
+                            "repetitiveEvent",
+                            (e.target as HTMLInputElement).checked
+                          )
+                        }
+                      />
+                      <span>Evento repetitivo</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Referencia</label>
+                    <Input
+                      value={eventState.reference}
+                      onInput={(e) =>
+                        updateEventField(
+                          "reference",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Referencia"
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Atributos</label>
@@ -1544,373 +1963,20 @@ export function CrearEventoDetalle() {
                     </div>
                   </div>
                 </div>
-                </CardContent>
-              )}
-            </Card>
-
-            <Card>
-              <CardHeader
-                className="cursor-pointer"
-                onClick={() =>
-                  setOpenSections((prev) => ({
-                    ...prev,
-                    billing: !prev.billing,
-                  }))
-                }
-              >
-                <div className="flex items-center justify-between">
-                  <CardTitle>Cliente, Contrato y Facturacion</CardTitle>
-                  <ChevronDown
-                    className={`h-5 w-5 transition-transform ${
-                      openSections.billing ? "rotate-180" : ""
-                    }`}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Comentarios internos
+                  </label>
+                  <Textarea
+                    value={eventState.internalComments}
+                    onInput={(e) =>
+                      updateEventField(
+                        "internalComments",
+                        (e.target as HTMLTextAreaElement).value
+                      )
+                    }
+                    placeholder="Comentarios internos"
                   />
-                </div>
-              </CardHeader>
-              {openSections.billing && (
-                <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Responsable de la Cuenta
-                    </label>
-                    <Select
-                      value={eventState.idClientEventManager}
-                      onChange={(e) =>
-                        updateEventField(
-                          "idClientEventManager",
-                          (e.target as HTMLSelectElement).value
-                        )
-                      }
-                    >
-                      <option value="">Selecciona responsable</option>
-                      {clientManagers.map((manager) => (
-                        <option
-                          key={manager.idClientEventManager}
-                          value={String(manager.idClientEventManager)}
-                        >
-                          {manager.clientEventManagerName ||
-                            manager.clientEventManagerEmail ||
-                            "Responsable"}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Coordinador de evento
-                    </label>
-                    <Select
-                      value={eventState.idEventCoordinator}
-                      onChange={(e) =>
-                        updateEventField(
-                          "idEventCoordinator",
-                          (e.target as HTMLSelectElement).value
-                        )
-                      }
-                    >
-                      <option value="">Selecciona coordinador</option>
-                      {eventCoordinators.map((coord) => (
-                        <option key={coord.id} value={coord.id}>
-                          {coord.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Contrato</label>
-                    <Input
-                      value={eventState.contractNumber}
-                      onInput={(e) =>
-                        updateEventField(
-                          "contractNumber",
-                          (e.target as HTMLInputElement).value
-                        )
-                      }
-                      placeholder="Numero de contrato"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Referencia</label>
-                    <Input
-                      value={eventState.reference}
-                      onInput={(e) =>
-                        updateEventField(
-                          "reference",
-                          (e.target as HTMLInputElement).value
-                        )
-                      }
-                      placeholder="Referencia"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Nombre de facturacion
-                    </label>
-                    <Input
-                      value={eventState.billingName}
-                      onInput={(e) =>
-                        updateEventField(
-                          "billingName",
-                          (e.target as HTMLInputElement).value
-                        )
-                      }
-                      placeholder="Nombre para facturar"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Fecha vencimiento cotizacion
-                    </label>
-                    <DatePicker
-                      value={eventState.quoteExpirationDate}
-                      onInput={(e) =>
-                        updateEventField(
-                          "quoteExpirationDate",
-                          (e.target as HTMLInputElement).value
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Forma de pago</label>
-                    <Select
-                      value={eventState.idEventPaymentForm}
-                      onChange={(e) =>
-                        updateEventField(
-                          "idEventPaymentForm",
-                          (e.target as HTMLSelectElement).value
-                        )
-                      }
-                    >
-                      <option value="">Selecciona forma de pago</option>
-                      {paymentForms.map((form) => (
-                        <option
-                          key={form.idPaymentForm}
-                          value={String(form.idPaymentForm)}
-                        >
-                          {form.paymentFormName}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Impuestos</label>
-                    <Select
-                      value={eventState.idExemption}
-                      onChange={(e) =>
-                        updateEventField(
-                          "idExemption",
-                          (e.target as HTMLSelectElement).value
-                        )
-                      }
-                    >
-                      <option value="">Selecciona impuestos</option>
-                      {taxExemptions.map((ex) => (
-                        <option
-                          key={ex.idTaxExemption}
-                          value={String(ex.idTaxExemption)}
-                        >
-                          {ex.taxExemptionName}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Propina</label>
-                    <Select
-                      value={eventState.idExtraTip}
-                      onChange={(e) =>
-                        (() => {
-                          const value = (e.target as HTMLSelectElement).value;
-                          updateEventField("idExtraTip", value);
-                          if (!value) {
-                            updateEventField("extraTipAmount", "");
-                          }
-                        })()
-                      }
-                    >
-                      <option value="">Selecciona propina</option>
-                      {extraTips.map((tip) => (
-                        <option
-                          key={tip.idExtraTip}
-                          value={String(tip.idExtraTip)}
-                        >
-                          {tip.extraTipName}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Imprevisto</label>
-                    <Select
-                      value={eventState.idContingency}
-                      onChange={(e) =>
-                        (() => {
-                          const value = (e.target as HTMLSelectElement).value;
-                          updateEventField("idContingency", value);
-                          if (!value) {
-                            updateEventField("contingenciesAmount", "");
-                          }
-                        })()
-                      }
-                    >
-                      <option value="">Selecciona imprevisto</option>
-                      {contingencies.map((cont) => (
-                        <option
-                          key={cont.idContingency}
-                          value={String(cont.idContingency)}
-                        >
-                          {cont.contingencyName}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  {eventState.idExtraTip && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Monto propina</label>
-                      <Input
-                        type="number"
-                        value={eventState.extraTipAmount}
-                        onInput={(e) =>
-                          updateEventField(
-                            "extraTipAmount",
-                            (e.target as HTMLInputElement).value
-                          )
-                        }
-                        step="0.01"
-                      />
-                    </div>
-                  )}
-                  {eventState.idContingency && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Monto imprevisto</label>
-                      <Input
-                        type="number"
-                        value={eventState.contingenciesAmount}
-                        onInput={(e) =>
-                          updateEventField(
-                            "contingenciesAmount",
-                            (e.target as HTMLInputElement).value
-                          )
-                        }
-                        step="0.01"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Firma contrato</label>
-                    <DatePicker
-                      value={eventState.signatureDate}
-                      onInput={(e) =>
-                        updateEventField(
-                          "signatureDate",
-                          (e.target as HTMLInputElement).value
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Operador creacion
-                    </label>
-                    <Input
-                      type="number"
-                      value={eventState.idCreationOper}
-                      onInput={(e) =>
-                        updateEventField(
-                          "idCreationOper",
-                          (e.target as HTMLInputElement).value
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={eventState.repetitiveEvent}
-                      onChange={(e) =>
-                        updateEventField(
-                          "repetitiveEvent",
-                          (e.target as HTMLInputElement).checked
-                        )
-                      }
-                    />
-                    Evento repetitivo
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={eventState.personalContract}
-                      onChange={(e) =>
-                        updateEventField(
-                          "personalContract",
-                          (e.target as HTMLInputElement).checked
-                        )
-                      }
-                    />
-                    Contrato personal
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={eventState.contractAlreadySigned}
-                      onChange={(e) =>
-                        updateEventField(
-                          "contractAlreadySigned",
-                          (e.target as HTMLInputElement).checked
-                        )
-                      }
-                    />
-                    Contrato firmado
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Comentarios</label>
-                    <Textarea
-                      value={eventState.comments}
-                      onInput={(e) =>
-                        updateEventField(
-                          "comments",
-                          (e.target as HTMLTextAreaElement).value
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Comentarios internos
-                    </label>
-                    <Textarea
-                      value={eventState.internalComments}
-                      onInput={(e) =>
-                        updateEventField(
-                          "internalComments",
-                          (e.target as HTMLTextAreaElement).value
-                        )
-                      }
-                    />
-                  </div>
                 </div>
                 </CardContent>
               )}
@@ -1937,6 +2003,36 @@ export function CrearEventoDetalle() {
               </CardHeader>
               {openSections.activities && (
                 <CardContent className="space-y-6">
+                {loadingSections.activities && (
+                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+                    <Spinner size="sm" />
+                    <span className="text-muted-foreground">
+                      Cargando parametros de actividades...
+                    </span>
+                  </div>
+                )}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Imprevisto</label>
+                    <Select
+                      value={eventState.idContingency}
+                      onChange={(e) =>
+                        updateEventField(
+                          "idContingency",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona imprevisto</option>
+                      {contingencies.map((cont) => (
+                        <option
+                          key={cont.idContingency}
+                          value={String(cont.idContingency)}
+                        >
+                          {cont.contingencyName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
                       Agrega actividades, salones y servicios para el evento.
@@ -2039,34 +2135,6 @@ export function CrearEventoDetalle() {
                               updateActivity(
                                 activityIndex,
                                 "startTime",
-                                (e.target as HTMLInputElement).value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Fin</label>
-                          <Input
-                            type="datetime-local"
-                            value={activity.endTime}
-                            onInput={(e) =>
-                              updateActivity(
-                                activityIndex,
-                                "endTime",
-                                (e.target as HTMLInputElement).value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Check-out</label>
-                          <Input
-                            type="datetime-local"
-                            value={activity.checkOutTime}
-                            onInput={(e) =>
-                              updateActivity(
-                                activityIndex,
-                                "checkOutTime",
                                 (e.target as HTMLInputElement).value
                               )
                             }
