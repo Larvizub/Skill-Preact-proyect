@@ -51,3 +51,18 @@ idData: 14
 - Para Obtener los Eventos: https://skill4it.atlassian.net/wiki/spaces/FWS/pages/2204532737/GetEvents 
 - Para Obtener la cotización de los Eventos: https://skill4it.atlassian.net/wiki/spaces/FWS/pages/2219114497/GetEventQuote 
 - Para Obtener las facturas: https://skill4it.atlassian.net/wiki/spaces/FWS/pages/2231762946/GetEventInvoices
+- Para Crear Eventos: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2175467570/AddEvent 
+- Para Editar Eventos: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2184249345/UpdateEvent
+- Para Crear añadir una actividad: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2175336449/AddEventActivity
+- Para Añadir una actividad: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2282618881/AddClientEventManager
+- Para Añadir una cuenta: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2282618881/AddClientEventManager
+- Para Añadir un cliente: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2181300225/AddClient 
+- Para Añadir un Servicio a la actividad: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2175369266/AddActivityService
+- Para Añadir un Salón: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2175369242/AddActivityRoom
+- Para Editar una Cuenta: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2284584961/UpdateClientEventManager
+- Para editar un cliente: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2181300251/UpdateClient 
+- Para editar un Servicio: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2184445953/UpdateActivityService
+- Para editar una actividad: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2183790596/UpdateEventActivity
+- Para editar un salón: https://skill4it.atlassian.net/wiki/spaces/apidoc/pages/2183790613/UpdateActivityRoom
+
+
