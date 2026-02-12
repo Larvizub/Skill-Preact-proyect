@@ -205,6 +205,7 @@ export function CrearEventoDetalle() {
         characterData,
         sectorData,
         sizeData,
+        currencyData,
         paymentData,
         taxData,
         extraTipData,
@@ -227,6 +228,7 @@ export function CrearEventoDetalle() {
         safeLoad("eventCharacters", () => apiService.getEventCharacters(), []),
         safeLoad("eventSectors", () => apiService.getEventSectors(), []),
         safeLoad("eventSizes", () => apiService.getEventSizes(), []),
+        safeLoad("billingCurrencies", () => apiService.getBillingCurrencies(), []),
         safeLoad(
           "eventPaymentForms",
           () => apiService.getEventPaymentForms(),
@@ -277,6 +279,22 @@ export function CrearEventoDetalle() {
         setTaxExemptions(taxData || []);
         setExtraTips(extraTipData || []);
         setContingencies(contingencyData || []);
+
+        if (!eventState.idCurrency) {
+          const preferred =
+            (currencyData || []).find(
+              (currency: any) => Number(currency.idCurrency) === 3
+            ) || (currencyData || [])[0];
+          const resolvedId = preferred?.idCurrency ?? 3;
+          setEventState((prev) =>
+            prev.idCurrency
+              ? prev
+              : {
+                  ...prev,
+                  idCurrency: String(resolvedId),
+                }
+          );
+        }
 
       if (clientData.length === 0 || salesData.length === 0) {
         setError(
@@ -658,6 +676,7 @@ export function CrearEventoDetalle() {
         startDate: eventState.startDate,
         endDate: eventState.endDate,
         idClient: toNumberOrNull(eventState.idClient),
+        idCurrency: toNumberOrNull(eventState.idCurrency) ?? 3,
         discountPercentage: toNumberOrNull(eventState.discountPercentage),
         idSalesAgent: toNumberOrNull(eventState.idSalesAgent),
         idEventSubsegment: toNumberOrNull(eventState.idEventSubsegment),
