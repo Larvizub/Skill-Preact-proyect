@@ -63,6 +63,7 @@ import {
   ChevronDown,
   ShieldCheck,
   Leaf,
+  Repeat,
   Search,
 } from "lucide-preact";
 
@@ -2335,7 +2336,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
               <div className="h-px w-full bg-border/70" />
 
-              {/* Row 4: PAX / Stands / Repetitivo */}
+              {/* Row 4: PAX / Stands */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
@@ -2366,18 +2367,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Evento Repetitivo
-                  </p>
-                  <p className="text-sm mt-1">
-                    {hasRepetitiveEvent
-                      ? rawEvent?.repetitiveEvent
-                        ? "Si"
-                        : "No"
-                      : "-"}
-                  </p>
-                </div>
               </div>
 
               <div className="h-px w-full bg-border/70" />
@@ -2460,7 +2449,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
               <div className="h-px w-full bg-border/70" />
 
-              {/* Row 4: ICCA / Sostenible */}
+              {/* Row 7: ICCA / Sostenible / Repetitivo */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
@@ -2494,7 +2483,28 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   </div>
                 </div>
 
-                <div aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Evento Repetitivo
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {hasRepetitiveEvent ? (
+                      rawEvent?.repetitiveEvent ? (
+                        <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                          <Repeat className="h-4 w-4" />
+                          <span className="text-sm">Sí</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                          <Repeat className="h-4 w-4" />
+                          <span className="text-sm">No</span>
+                        </div>
+                      )
+                    ) : (
+                      <span className="text-sm text-muted-foreground italic">-</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

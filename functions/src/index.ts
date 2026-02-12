@@ -22,12 +22,81 @@ const DEFAULT_COMPANY_AUTH_ID =
   process.env.COMPANY_AUTH_ID || "xudQREZBrfGdw0ag8tE3NR3XhM6LGa";
 const DEFAULT_ID_DATA = process.env.ID_DATA || "14";
 
-const extractAuthPayload = (headers: Record<string, string>) => ({
-  companyAuthId: headers["companyauthid"] || DEFAULT_COMPANY_AUTH_ID,
-  idData: headers["iddata"] || DEFAULT_ID_DATA,
-});
+const pickString = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const getFromObject = (obj: unknown, keys: string[]): string | null => {
+  if (!obj || typeof obj !== "object") return null;
+  const record = obj as Record<string, unknown>;
+  for (const key of keys) {
+    const value = pickString(record[key]);
+    if (value) return value;
+  }
+  return null;
+};
+
+const extractAuthPayload = (
+  headers: Record<string, string>,
+  body?: unknown
+) => {
+  const bodyRoot = body && typeof body === "object" ? body : undefined;
+  const bodyEvent =
+    bodyRoot && typeof (bodyRoot as any).Event === "object"
+      ? (bodyRoot as any).Event
+      : bodyRoot && typeof (bodyRoot as any).event === "object"
+      ? (bodyRoot as any).event
+      : undefined;
+
+  const bodyCompanyAuthId =
+    getFromObject(bodyRoot, ["companyAuthId", "companyauthid", "company_id"]) ||
+    getFromObject(bodyEvent, ["companyAuthId", "companyauthid", "company_id"]);
+  const bodyIdData =
+    getFromObject(bodyRoot, ["idData", "iddata", "id_data"]) ||
+    getFromObject(bodyEvent, ["idData", "iddata", "id_data"]);
+
+  return {
+    companyAuthId:
+      headers["companyauthid"] || bodyCompanyAuthId || DEFAULT_COMPANY_AUTH_ID,
+    idData: headers["iddata"] || bodyIdData || DEFAULT_ID_DATA,
+  };
+};
 
 type CandidateBuilder = (context: TransformContext) => TransformResult[];
+
+const normalizeUpdateEventBody = (
+  body: unknown,
+  path: string,
+  headers: Record<string, string>
+) => {
+  const auth = extractAuthPayload(headers, body);
+  const idFromPathMatch = path.match(/\/events\/event\/(\d+)/i);
+  const idFromPath = idFromPathMatch ? Number(idFromPathMatch[1]) : undefined;
+
+  const bodyObj = typeof body === "object" && body !== null ? (body as any) : {};
+  const eventPayload =
+    bodyObj.Event ?? bodyObj.event ?? bodyObj?.events ?? bodyObj ?? {};
+
+  const normalizedEvent = {
+    ...(typeof eventPayload === "object" && eventPayload !== null
+      ? eventPayload
+      : {}),
+    ...(idFromPath && !(eventPayload as any)?.idEvent ? { idEvent: idFromPath } : {}),
+  };
+
+  return {
+    eventWrapper: {
+      ...auth,
+      Event: normalizedEvent,
+    },
+    eventRaw: {
+      ...auth,
+      ...normalizedEvent,
+    },
+  };
+};
 
 const candidateBuilders: Record<string, CandidateBuilder> = {
   "/events/getrooms": ({ headers, method }) => [
@@ -39,6 +108,7 @@ const candidateBuilders: Record<string, CandidateBuilder> = {
     },
   ],
   "/events/getservices": ({ headers, body, method }) => {
+    const authPayload = extractAuthPayload(headers, body);
     const baseBody =
       typeof body === "object" && body !== null ? body : undefined;
     const fallbackBody = {
@@ -46,7 +116,7 @@ const candidateBuilders: Record<string, CandidateBuilder> = {
         serviceName: "",
       },
       ...(baseBody ?? {}),
-      ...extractAuthPayload(headers),
+      ...authPayload,
     };
     return [
       { path: "/events/getservices", method, body: baseBody },
@@ -54,10 +124,11 @@ const candidateBuilders: Record<string, CandidateBuilder> = {
     ];
   },
   "/events": ({ headers, body, method }) => {
+    const authPayload = extractAuthPayload(headers, body);
     const baseBody =
       typeof body === "object" && body !== null ? body : undefined;
     const fallbackBody = {
-      ...extractAuthPayload(headers),
+      ...authPayload,
       ...(baseBody ?? {}),
     };
     return [
@@ -138,6 +209,22 @@ export const proxyApiV2 = onRequest(
           }
         }
 
+        const hadIdDataHeader = Boolean(headers["iddata"]);
+        const resolvedAuth = extractAuthPayload(headers, parsedBody);
+        if (!hadIdDataHeader) {
+          headers["iddata"] = resolvedAuth.idData;
+        }
+        if (!headers["companyauthid"]) {
+          headers["companyauthid"] = resolvedAuth.companyAuthId;
+        }
+
+        if (resolvedAuth.idData === DEFAULT_ID_DATA && !hadIdDataHeader) {
+          console.warn("proxy: using default idData", {
+            path: forwardedPath,
+            defaultIdData: DEFAULT_ID_DATA,
+          });
+        }
+
         const normalizedPath = forwardedPath.toLowerCase();
         const context: TransformContext = {
           headers,
@@ -145,7 +232,46 @@ export const proxyApiV2 = onRequest(
           method: req.method,
         };
 
-        const candidates = candidateBuilders[normalizedPath]
+        const isEventUpdatePath = /^\/events\/event(\/\d+)?$/i.test(
+          forwardedPath
+        );
+
+        const candidates = isEventUpdatePath
+          ? (() => {
+              const normalized = normalizeUpdateEventBody(
+                parsedBody,
+                forwardedPath,
+                headers
+              );
+              return [
+                {
+                  path: forwardedPath,
+                  method: req.method,
+                  body: parsedBody,
+                },
+                {
+                  path: forwardedPath,
+                  method: "PUT",
+                  body: parsedBody,
+                },
+                {
+                  path: "/events/updateevent",
+                  method: "POST",
+                  body: normalized.eventWrapper,
+                },
+                {
+                  path: "/UpdateEvent",
+                  method: "POST",
+                  body: normalized.eventWrapper,
+                },
+                {
+                  path: "/UpdateEvent",
+                  method: "POST",
+                  body: normalized.eventRaw,
+                },
+              ];
+            })()
+          : candidateBuilders[normalizedPath]
           ? candidateBuilders[normalizedPath](context)
           : [
               {
