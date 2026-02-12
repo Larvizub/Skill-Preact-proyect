@@ -28,6 +28,50 @@ export function createClientsService({
   withFallback,
   getEvents,
 }: CreateClientsServiceDeps) {
+  const createClient = async (clientPayload: Partial<Client>) => {
+    const body = {
+      Client: {
+        clientName:
+          clientPayload.clientName ||
+          clientPayload.tradeName ||
+          clientPayload.legalName ||
+          "Cliente CRM",
+        tradeName: clientPayload.tradeName || clientPayload.clientName,
+        legalName:
+          clientPayload.legalName ||
+          clientPayload.tradeName ||
+          clientPayload.clientName,
+        identificationNumber: clientPayload.identificationNumber,
+        email: clientPayload.email,
+        phone: clientPayload.phone,
+        address: clientPayload.address,
+        city: clientPayload.city,
+        province: clientPayload.province,
+      },
+    };
+
+    return withFallback(
+      () =>
+        apiRequest<{
+          success?: boolean;
+          errorCode?: number;
+          result?: { client?: Client; idClient?: number; clientCode?: string };
+        }>("/clients", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+      () =>
+        apiRequest<{
+          success?: boolean;
+          errorCode?: number;
+          result?: { client?: Client; idClient?: number; clientCode?: string };
+        }>("/AddClient", {
+          method: "POST",
+          body: buildPayload(body.Client as Record<string, unknown>),
+        })
+    );
+  };
+
   const getClients = async (): Promise<Client[]> => {
     try {
       // Intentar endpoint directo de clientes primero
@@ -173,6 +217,7 @@ export function createClientsService({
   };
 
   return {
+    createClient,
     getClients,
     getContacts,
   };

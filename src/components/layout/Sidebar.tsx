@@ -15,6 +15,7 @@ import {
   UsersRound,
   Car,
   LogOut,
+  BriefcaseBusiness,
 } from "lucide-preact";
 import { useTheme } from "../../contexts/ThemeContext";
 import { cn } from "../../lib/utils";
@@ -39,6 +40,7 @@ const menuItems = [
   { path: "/inventario", label: "Inventario", icon: Package },
   { path: "/personal-eventos", label: "Personal Eventos", icon: UsersRound },
   { path: "/parqueos-eventos", label: "Parqueos Eventos", icon: Car },
+  { path: "/crm", label: "CRM", icon: BriefcaseBusiness },
   { path: "/clientes", label: "Clientes", icon: Users },
   { path: "/contactos", label: "Contactos", icon: UserCircle },
   { path: "/coordinadores", label: "Coordinadores", icon: UserCog },

@@ -15,6 +15,7 @@ import { Contactos } from "./pages/Contactos.tsx";
 import { Coordinadores } from "./pages/Coordinadores.tsx";
 import { PersonalEventos } from "./pages/PersonalEventos.tsx";
 import { ParqueosEventos } from "./pages/ParqueosEventos.tsx";
+import { CRM } from "./pages/CRM.tsx";
 import { ApiTest } from "./pages/ApiTest.tsx";
 import "./app.css";
 
@@ -51,6 +52,8 @@ function App() {
         <Contactos path="/contactos" />
         {/* @ts-ignore - preact-router path prop types */}
         <Coordinadores path="/coordinadores" />
+        {/* @ts-ignore - preact-router path prop types */}
+        <CRM path="/crm" />
         {/* @ts-ignore - preact-router path prop types */}
         <PersonalEventos path="/personal-eventos" />
         {/* @ts-ignore - preact-router path prop types */}
