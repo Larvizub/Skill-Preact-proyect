@@ -230,12 +230,20 @@ export const crmService = {
     await update(itemRef, {
       linkedSkillEvent: link,
       stage: "cotizadoSkill",
+      ...(typeof link.quoteAmount === "number"
+        ? { estimatedValue: link.quoteAmount }
+        : {}),
       updatedAt: nowIso(),
     });
 
     await createTimelineEntry(dbKey, opportunityId, {
       type: "linkedSkillEvent",
-      message: `Enlazada al evento de Skill #${link.eventNumber}.`,
+      message:
+        typeof link.quoteAmount === "number"
+          ? `Enlazada al evento de Skill #${link.eventNumber}. Total cotizado: $${link.quoteAmount.toFixed(
+              2
+            )} USD.`
+          : `Enlazada al evento de Skill #${link.eventNumber}.`,
       stage: "cotizadoSkill",
     });
   },

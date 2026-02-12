@@ -46,11 +46,7 @@ import {
   type OpportunityTimelineEntry,
 } from "../types/crm";
 import { apiService } from "../services/api.service";
-
-type SkillEventOption = {
-  eventNumber: string;
-  title: string;
-};
+import { resolveEventQuoteGrandTotal } from "../lib/quoteUtils";
 
 const STAGE_BADGE_CLASS: Record<OpportunityStage, string> = {
   prospecto: "bg-muted text-muted-foreground",
@@ -84,8 +80,9 @@ const formatCurrency = (value?: number) => {
 
   return new Intl.NumberFormat("es-CR", {
     style: "currency",
-    currency: "CRC",
-    maximumFractionDigits: 0,
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 };
 
@@ -118,13 +115,8 @@ export function CRM() {
   const [linkingOpportunity, setLinkingOpportunity] = useState<Opportunity | null>(
     null
   );
-  const [eventSearchType, setEventSearchType] = useState<"eventNumber" | "eventName">(
-    "eventNumber"
-  );
-  const [eventSearchValue, setEventSearchValue] = useState("");
-  const [searchingEvents, setSearchingEvents] = useState(false);
-  const [skillEvents, setSkillEvents] = useState<SkillEventOption[]>([]);
-  const [selectedSkillEventNumber, setSelectedSkillEventNumber] = useState("");
+  const [eventIdInput, setEventIdInput] = useState("");
+  const [linkingSkillEvent, setLinkingSkillEvent] = useState(false);
   const [creatingClientInSkillId, setCreatingClientInSkillId] = useState("");
 
   const totalPipelineValue = useMemo(
@@ -281,6 +273,11 @@ export function CRM() {
       return;
     }
 
+    if (newStage === "cotizadoSkill") {
+      openLinkDialog(opportunity);
+      return;
+    }
+
     try {
       await crmService.changeOpportunityStage(
         selectedDb,
@@ -367,70 +364,64 @@ export function CRM() {
   const openLinkDialog = (opportunity: Opportunity) => {
     setLinkingOpportunity(opportunity);
     setLinkDialogOpen(true);
-    setSkillEvents([]);
-    setSelectedSkillEventNumber("");
-    setEventSearchValue("");
-    setEventSearchType("eventNumber");
+    setEventIdInput(opportunity.linkedSkillEvent?.eventNumber || "");
   };
 
-  const searchSkillEvents = async () => {
-    if (!eventSearchValue.trim()) {
-      alert("Ingresa un valor para buscar evento.");
-      return;
+  const linkOpportunityByEventId = async (
+    opportunity: Opportunity,
+    eventId: string
+  ) => {
+    const normalizedEventId = eventId.trim();
+    if (!normalizedEventId) {
+      throw new Error("Debes indicar el ID de evento de Skill.");
     }
 
-    setSearchingEvents(true);
-    try {
-      const events =
-        eventSearchType === "eventNumber"
-          ? await apiService.getEvents(undefined, undefined, eventSearchValue.trim())
-          : await apiService.getEvents(
-              undefined,
-              undefined,
-              undefined,
-              eventSearchValue.trim()
-            );
+    const events = await apiService.getEvents(undefined, undefined, normalizedEventId);
+    const rawEvent =
+      events.find(
+        (event: any) =>
+          String(event?.idEvent ?? "") === normalizedEventId ||
+          String(event?.eventNumber ?? "") === normalizedEventId
+      ) || events[0];
 
-      const options = events
-        .slice(0, 20)
-        .map((event: any) => ({
-          eventNumber: String(event?.eventNumber || event?.idEvent || ""),
-          title: String(event?.title || "Sin título"),
-        }))
-        .filter((item: SkillEventOption) => item.eventNumber);
-
-      setSkillEvents(options);
-      if (options.length > 0) {
-        setSelectedSkillEventNumber(options[0].eventNumber);
-      }
-    } catch (error) {
-      console.error("Error buscando eventos de Skill:", error);
-      alert("No se pudieron consultar los eventos en Skill.");
-    } finally {
-      setSearchingEvents(false);
+    if (!rawEvent) {
+      throw new Error("No se encontró el evento en Skill con ese ID.");
     }
+
+    const eventIdForQuote = String(rawEvent?.idEvent || normalizedEventId);
+    const quote = await apiService.getEventQuote(eventIdForQuote);
+    const quoteAmount = resolveEventQuoteGrandTotal(rawEvent, quote);
+
+    await crmService.linkOpportunityToSkillEvent(selectedDb, opportunity.id, {
+      eventNumber: String(rawEvent?.eventNumber || rawEvent?.idEvent || normalizedEventId),
+      title: String(rawEvent?.title || "Sin título"),
+      ...(Number.isFinite(quoteAmount) && quoteAmount > 0
+        ? { quoteAmount }
+        : {}),
+    });
   };
 
   const linkToSkillEvent = async () => {
-    if (!linkingOpportunity || !selectedSkillEventNumber) {
+    if (!linkingOpportunity) {
       return;
     }
 
-    const selectedEvent = skillEvents.find(
-      (item) => item.eventNumber === selectedSkillEventNumber
-    );
-
+    setLinkingSkillEvent(true);
     try {
-      await crmService.linkOpportunityToSkillEvent(selectedDb, linkingOpportunity.id, {
-        eventNumber: selectedSkillEventNumber,
-        title: selectedEvent?.title,
-      });
+      await linkOpportunityByEventId(linkingOpportunity, eventIdInput);
 
       setLinkDialogOpen(false);
       setLinkingOpportunity(null);
+      setEventIdInput("");
     } catch (error) {
       console.error("Error enlazando oportunidad a Skill:", error);
-      alert("No se pudo enlazar la oportunidad con el evento en Skill.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "No se pudo enlazar la oportunidad con el evento en Skill."
+      );
+    } finally {
+      setLinkingSkillEvent(false);
     }
   };
 
@@ -555,7 +546,7 @@ export function CRM() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Valor estimado (CRC)</Label>
+                  <Label>Valor estimado (USD)</Label>
                   <Input
                     type="number"
                     value={form.estimatedValue}
@@ -763,7 +754,7 @@ export function CRM() {
                               onClick={() => openLinkDialog(item)}
                             >
                               <Link className="h-4 w-4 mr-1" />
-                              Enlazar Skill
+                              Enlazar por ID Evento
                             </Button>
                             <Button
                               variant="outline"
@@ -891,71 +882,25 @@ export function CRM() {
               <DialogDescription>
                 {linkingOpportunity
                   ? `${linkingOpportunity.title} · ${linkingOpportunity.client.name}`
-                  : "Selecciona un evento de Skill para esta oportunidad."}
+                  : "Indica el ID de Evento de Skill para enlazar esta oportunidad."}
               </DialogDescription>
             </div>
           </DialogHeader>
 
           <DialogBody className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[180px_1fr_auto] md:items-end">
-              <div className="space-y-2">
-                <Label>Tipo búsqueda</Label>
-                <Select
-                  value={eventSearchType}
-                  onChange={(event) =>
-                    setEventSearchType(
-                      (event.target as HTMLSelectElement).value as
-                        | "eventNumber"
-                        | "eventName"
-                    )
-                  }
-                >
-                  <option value="eventNumber">N° Evento</option>
-                  <option value="eventName">Nombre</option>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Valor</Label>
-                <Input
-                  value={eventSearchValue}
-                  onInput={(event) =>
-                    setEventSearchValue((event.target as HTMLInputElement).value)
-                  }
-                  placeholder={
-                    eventSearchType === "eventNumber"
-                      ? "Ej. 10234"
-                      : "Ej. Congreso"
-                  }
-                />
-              </div>
-
-              <Button onClick={searchSkillEvents} disabled={searchingEvents}>
-                {searchingEvents ? <Spinner size="sm" /> : "Buscar"}
-              </Button>
-            </div>
-
             <div className="space-y-2">
-              <Label>Evento de Skill</Label>
-              <Select
-                value={selectedSkillEventNumber}
-                onChange={(event) =>
-                  setSelectedSkillEventNumber(
-                    (event.target as HTMLSelectElement).value
-                  )
+              <Label>ID de Evento en Skill</Label>
+              <Input
+                value={eventIdInput}
+                onInput={(event) =>
+                  setEventIdInput((event.target as HTMLInputElement).value)
                 }
-                disabled={skillEvents.length === 0}
-              >
-                {skillEvents.length === 0 ? (
-                  <option value="">Sin resultados</option>
-                ) : (
-                  skillEvents.map((item) => (
-                    <option key={item.eventNumber} value={item.eventNumber}>
-                      #{item.eventNumber} · {item.title}
-                    </option>
-                  ))
-                )}
-              </Select>
+                placeholder="Ej. 10234"
+              />
+              <p className="text-xs text-muted-foreground">
+                Al enlazar se actualizará automáticamente el valor estimado con el
+                total de la cotización del evento en USD.
+              </p>
             </div>
           </DialogBody>
 
@@ -965,9 +910,16 @@ export function CRM() {
             </Button>
             <Button
               onClick={linkToSkillEvent}
-              disabled={!selectedSkillEventNumber || !linkingOpportunity}
+              disabled={!eventIdInput.trim() || !linkingOpportunity || linkingSkillEvent}
             >
-              Enlazar evento
+              {linkingSkillEvent ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  Enlazando...
+                </>
+              ) : (
+                "Enlazar evento"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
