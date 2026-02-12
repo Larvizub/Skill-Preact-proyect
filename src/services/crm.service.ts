@@ -61,6 +61,10 @@ const normalizeOpportunity = (item: RawObject, id: string): Opportunity => {
     expectedCloseDate: (item.expectedCloseDate as string) || undefined,
     notes: (item.notes as string) || undefined,
     owner: (item.owner as string) || undefined,
+    details:
+      item.details && typeof item.details === "object"
+        ? (item.details as Record<string, unknown>)
+        : undefined,
     client: {
       name: String(client.name || ""),
       tradeName: (client.tradeName as string) || undefined,
@@ -157,6 +161,7 @@ export const crmService = {
       expectedCloseDate: input.expectedCloseDate,
       notes: input.notes,
       owner: input.owner,
+      details: input.details,
       client: input.client,
       createdAt: timestamp,
       updatedAt: timestamp,

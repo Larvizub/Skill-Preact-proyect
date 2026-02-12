@@ -7,9 +7,15 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ComponentChildren;
+  panelClassName?: string;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  children,
+  panelClassName,
+}: DialogProps) {
   if (!open) return null;
 
   const dialog = (
@@ -22,7 +28,12 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 
       {/* Dialog */}
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-        <div className="relative bg-background border border-border rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div
+          className={cn(
+            "relative bg-background border border-border rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col",
+            panelClassName
+          )}
+        >
           {children}
         </div>
       </div>

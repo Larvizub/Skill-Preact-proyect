@@ -41,6 +41,7 @@ export interface Opportunity {
   expectedCloseDate?: string;
   notes?: string;
   owner?: string;
+  details?: Record<string, unknown>;
   client: OpportunityClient;
   linkedSkillEvent?: SkillEventLink;
   skillClient?: SkillClientLink;
@@ -71,6 +72,7 @@ export interface CreateOpportunityInput {
   expectedCloseDate?: string;
   notes?: string;
   owner?: string;
+  details?: Record<string, unknown>;
   client: OpportunityClient;
 }
 
@@ -81,6 +83,7 @@ export interface UpdateOpportunityInput {
   expectedCloseDate?: string;
   notes?: string;
   owner?: string;
+  details?: Record<string, unknown>;
   client?: OpportunityClient;
 }
 
