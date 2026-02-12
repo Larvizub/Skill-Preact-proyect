@@ -14,9 +14,11 @@ import {
   CalendarCheck,
   UsersRound,
   Car,
+  LogOut,
 } from "lucide-preact";
 import { useTheme } from "../../contexts/ThemeContext";
 import { cn } from "../../lib/utils";
+import { authService } from "../../services/auth.service";
 
 interface SidebarProps {
   className?: string;
@@ -52,6 +54,14 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
   const handleNavigate = (path: string) => {
     route(path);
     // Cerrar el sidebar en móvil después de navegar
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    route("/login", true);
     if (onClose) {
       onClose();
     }
@@ -129,7 +139,7 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* Theme Toggle */}
+        {/* Theme Toggle + Logout */}
         <div className="p-4 border-t border-border">
           <button
             onClick={toggleTheme}
@@ -146,6 +156,14 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
                 <span>Tema Oscuro</span>
               </>
             )}
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="mt-2 flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors text-left hover:bg-destructive/15 hover:text-destructive"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Cerrar sesión</span>
           </button>
         </div>
       </aside>
