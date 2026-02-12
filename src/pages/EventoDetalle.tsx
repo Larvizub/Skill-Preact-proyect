@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "preact/hooks";
+import { useState, useEffect, useMemo, useRef } from "preact/hooks";
 import { route } from "preact-router";
 import { Layout } from "../components/layout/Layout";
 import {
@@ -64,6 +64,9 @@ import {
   ShieldCheck,
   Leaf,
   Repeat,
+  AlertCircle,
+  CheckCircle2,
+  LoaderCircle,
   Search,
 } from "lucide-preact";
 
@@ -148,8 +151,11 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
   const [editState, setEditState] = useState<EditEventState | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editSuccess, setEditSuccess] = useState<string | null>(null);
+  const [topNotice, setTopNotice] = useState<{
+    type: "success" | "error" | "loading";
+    message: string;
+  } | null>(null);
+  const topNoticeTimeoutRef = useRef<number | null>(null);
   const [editOptionsLoaded, setEditOptionsLoaded] = useState(false);
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
@@ -177,6 +183,36 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
   const [timeLeftMs, setTimeLeftMs] = useState<number | null>(null);
   const [countdownActive, setCountdownActive] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState<Date | null>(null);
+
+  const showTopNotice = (
+    message: string,
+    type: "success" | "error" | "loading",
+    durationMs = 4000
+  ) => {
+    if (topNoticeTimeoutRef.current) {
+      window.clearTimeout(topNoticeTimeoutRef.current);
+      topNoticeTimeoutRef.current = null;
+    }
+
+    setTopNotice({ type, message });
+
+    if (type !== "loading") {
+      topNoticeTimeoutRef.current = window.setTimeout(() => {
+        setTopNotice((current) =>
+          current?.message === message && current?.type === type ? null : current
+        );
+        topNoticeTimeoutRef.current = null;
+      }, durationMs);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (topNoticeTimeoutRef.current) {
+        window.clearTimeout(topNoticeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     console.log("=== EventoDetalle useEffect ===");
@@ -474,7 +510,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
   const loadEditOptions = async () => {
     setEditLoading(true);
-    setEditError(null);
+    setTopNotice(null);
 
     const safeLoad = async <T,>(
       label: string,
@@ -578,8 +614,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
       setEditOptionsLoaded(true);
     } catch (err) {
       console.error("Error cargando opciones del formulario:", err);
-      setEditError(
-        "No se pudieron cargar los datos de referencia. Verifica la conexion e intenta nuevamente."
+      showTopNotice(
+        "No se pudieron cargar los datos de referencia. Verifica la conexión e intenta nuevamente.",
+        "error",
+        6000
       );
     } finally {
       setEditLoading(false);
@@ -982,16 +1020,16 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
   const handleUpdateEvent = async () => {
     if (!editState) return;
-    setEditError(null);
-    setEditSuccess(null);
+    setTopNotice(null);
 
     const eventNumberValue = Number((event as any)?.eventNumber ?? 0);
     if (!eventNumberValue) {
-      setEditError("No se pudo determinar el numero del evento.");
+      showTopNotice("No se pudo determinar el número del evento.", "error");
       return;
     }
 
     setEditSaving(true);
+    showTopNotice("Guardando cambios...", "loading");
 
     try {
       const eventPayload = {
@@ -1134,7 +1172,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
         finalMismatches = computeMismatches(refreshed);
 
         if (finalMismatches.length === 0) {
-          setEditSuccess(`Evento actualizado correctamente. (${finalAttempt})`);
+          showTopNotice(
+            `Evento actualizado correctamente. (${finalAttempt})`,
+            "success"
+          );
           setEvent(refreshed as any);
           sessionStorage.setItem("currentEvent", JSON.stringify(refreshed));
           return;
@@ -1142,11 +1183,13 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
       }
 
       // Ningún intento logró persistir.
-      setEditSuccess(null);
-      setEditError(
+      showTopNotice(
         `La API respondió, pero al recargar el evento no aparecen los cambios (${finalMismatches.join(
           ", "
         )}). Ultimo intento: ${finalAttempt}.`
+        ,
+        "error",
+        6000
       );
       if (finalRefreshed) {
         setEvent(finalRefreshed as any);
@@ -1155,8 +1198,10 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
       return;
     } catch (err) {
       console.error("Error actualizando evento:", err);
-      setEditError(
-        err instanceof Error ? err.message : "No se pudo actualizar el evento."
+      showTopNotice(
+        err instanceof Error ? err.message : "No se pudo actualizar el evento.",
+        "error",
+        6000
       );
     } finally {
       setEditSaving(false);
@@ -1363,6 +1408,29 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
   return (
     <Layout>
       <div className="space-y-6 pb-8">
+        {topNotice && (
+          <div className="fixed top-4 left-1/2 z-50 w-[92vw] max-w-2xl -translate-x-1/2">
+            <div
+              className={`flex items-center gap-3 rounded-md border px-4 py-3 shadow-lg backdrop-blur-sm ${
+                topNotice.type === "success"
+                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                  : topNotice.type === "error"
+                  ? "border-destructive/40 bg-destructive/15 text-destructive"
+                  : "border-primary/40 bg-background/95 text-foreground"
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              {topNotice.type === "success" && <CheckCircle2 className="h-4 w-4" />}
+              {topNotice.type === "error" && <AlertCircle className="h-4 w-4" />}
+              {topNotice.type === "loading" && (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              )}
+              <p className="text-sm font-medium">{topNotice.message}</p>
+            </div>
+          </div>
+        )}
+
         {/* Header con botón de regreso */}
         <div className="flex items-center gap-4">
           <Button
@@ -1405,18 +1473,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
         {editOpen && editState && (
           <div className="space-y-4">
-            {editError && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                {editError}
-              </div>
-            )}
-
-            {editSuccess && (
-              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-600">
-                {editSuccess}
-              </div>
-            )}
-
             <Dialog open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
               <DialogContent>
                 <DialogHeader onClose={() => setClientSearchOpen(false)}>
