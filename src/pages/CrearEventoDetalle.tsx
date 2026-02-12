@@ -1122,7 +1122,7 @@ export function CrearEventoDetalle() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">PAX estimado</label>
                     <Input
@@ -1151,6 +1151,23 @@ export function CrearEventoDetalle() {
                         )
                       }
                       placeholder="Cantidad real"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Cantidad de stands
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={eventState.standsQuantity}
+                      onInput={(e) =>
+                        updateEventField(
+                          "standsQuantity",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Cantidad de stands"
                     />
                   </div>
                 </div>
