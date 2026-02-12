@@ -1,4 +1,4 @@
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useMemo } from "preact/hooks";
 import { route } from "preact-router";
 import { Layout } from "../components/layout/Layout";
 import {
@@ -9,8 +9,34 @@ import {
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Spinner } from "../components/ui/spinner";
+import { Input } from "../components/ui/input";
+import { Select } from "../components/ui/select";
+import { Textarea } from "../components/ui/textarea";
+import { DatePicker } from "../components/ui/datepicker";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import { apiService } from "../services/api.service";
 import type { Event } from "../services/api.service";
+import type {
+  Client,
+  ClientEventManager,
+  Contingency,
+  EventMarketSubSegment,
+  EventPaymentForm,
+  EventSector,
+  EventSize,
+  EventSubType,
+  ExtraTip,
+  MarketSegment,
+  SalesAgent,
+  TaxExemption,
+} from "../services/api.service";
 import {
   getEventStatusText,
   classifyEventStatus,
@@ -37,12 +63,74 @@ import {
   ChevronDown,
   ShieldCheck,
   Leaf,
+  Search,
 } from "lucide-preact";
 
 interface EventoDetalleProps {
   eventNumber?: string;
   id?: string;
 }
+
+interface EditEventState {
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  idClient: string;
+  idCurrency: string;
+  discountPercentage: string;
+  idSalesAgent: string;
+  idEventSubsegment: string;
+  idEventSegment: string;
+  idEventType: string;
+  idEventSubtype: string;
+  idEventCharacter: string;
+  idEventSector: string;
+  idEventSize: string;
+  idEventPaymentForm: string;
+  idClientEventManager: string;
+  idEventCoordinator: string;
+  repetitiveEvent: boolean;
+  estimatedPax: string;
+  realPax: string;
+  contractNumber: string;
+  reference: string;
+  comments: string;
+  internalComments: string;
+  idExemption: string;
+  idExtraTip: string;
+  extraTipAmount: string;
+  idContingency: string;
+  contingenciesAmount: string;
+  personalContract: boolean;
+  contractAlreadySigned: boolean;
+  signatureDate: string;
+  billingName: string;
+  quoteExpirationDate: string;
+  standsQuantity: string;
+  idCreationOper: string;
+  idEventStage: string;
+  sustainable: boolean;
+  icca: boolean;
+}
+
+const toNumberOrNull = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const toStringOrNull = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+const normalizeDateInput = (value?: string | null) => {
+  if (!value) return "";
+  if (value.includes("T")) return value.split("T")[0];
+  return value;
+};
 
 export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
   const eventIdentifier = eventNumber ?? id ?? null;
@@ -55,6 +143,35 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
   const [catalogServices, setCatalogServices] = useState<any[]>([]);
   const [quoteData, setQuoteData] = useState<any | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editState, setEditState] = useState<EditEventState | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
+  const [editOptionsLoaded, setEditOptionsLoaded] = useState(false);
+  const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [managerSearchOpen, setManagerSearchOpen] = useState(false);
+  const [managerSearchQuery, setManagerSearchQuery] = useState("");
+  const [clients, setClients] = useState<Client[]>([]);
+  const [salesAgents, setSalesAgents] = useState<SalesAgent[]>([]);
+  const [eventTypes, setEventTypes] = useState<any[]>([]);
+  const [subsegments, setSubsegments] = useState<EventMarketSubSegment[]>([]);
+  const [segments, setSegments] = useState<MarketSegment[]>([]);
+  const [subtypes, setSubtypes] = useState<EventSubType[]>([]);
+  const [characters, setCharacters] = useState<{ id: string; name: string }[]>(
+    []
+  );
+  const [sectors, setSectors] = useState<EventSector[]>([]);
+  const [sizes, setSizes] = useState<EventSize[]>([]);
+  const [paymentForms, setPaymentForms] = useState<EventPaymentForm[]>([]);
+  const [taxExemptions, setTaxExemptions] = useState<TaxExemption[]>([]);
+  const [extraTips, setExtraTips] = useState<ExtraTip[]>([]);
+  const [contingencies, setContingencies] = useState<Contingency[]>([]);
+  const [clientManagers, setClientManagers] = useState<ClientEventManager[]>(
+    []
+  );
   // Countdown state for quotes older than 1 month
   const [timeLeftMs, setTimeLeftMs] = useState<number | null>(null);
   const [countdownActive, setCountdownActive] = useState(false);
@@ -255,6 +372,779 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
     }
   };
 
+  const buildEditState = (raw: any): EditEventState => ({
+    title: String(raw?.title ?? ""),
+    description: String(raw?.description ?? ""),
+    startDate: normalizeDateInput(raw?.startDate),
+    endDate: normalizeDateInput(raw?.endDate),
+    idClient: String(raw?.idClient ?? raw?.client?.idClient ?? ""),
+    idCurrency: String(raw?.idCurrency ?? raw?.currency?.idCurrency ?? "3"),
+    discountPercentage: String(raw?.discountPercentage ?? ""),
+    idSalesAgent: String(raw?.idSalesAgent ?? raw?.salesAgent?.idSalesAgent ?? ""),
+    idEventSubsegment: String(
+      raw?.idEventSubsegment ??
+        raw?.idEventSubSegment ??
+        raw?.idEventMarketSubSegment ??
+        raw?.marketSubSegment?.idMarketSubSegment ??
+        raw?.eventMarketSubSegment?.idMarketSubSegment ??
+        raw?.eventMarketSubSegment?.idEventMarketSubSegment ??
+        raw?.idMarketSubSegment ??
+        ""
+    ),
+    idEventSegment: String(
+      raw?.idEventSegment ??
+        raw?.marketSegment?.idMarketSegment ??
+        raw?.eventMarketSegment?.idMarketSegment ??
+        raw?.idMarketSegment ??
+        ""
+    ),
+    idEventType: String(raw?.idEventType ?? raw?.eventType?.idEventType ?? ""),
+    idEventSubtype: String(
+      raw?.idEventSubtype ??
+        raw?.idEventSubType ??
+        raw?.eventSubtype?.idEventSubtype ??
+        raw?.eventSubType?.idEventSubType ??
+        raw?.eventSubType?.idSubType ??
+        ""
+    ),
+    idEventCharacter: String(
+      raw?.idEventCharacter ?? raw?.eventCharacter?.idEventCharacter ?? ""
+    ),
+    idEventSector: String(raw?.idEventSector ?? raw?.eventSector?.idEventSector ?? ""),
+    idEventSize: String(raw?.idEventSize ?? raw?.eventSize?.idEventSize ?? ""),
+    idEventPaymentForm: String(
+      raw?.idEventPaymentForm ??
+        raw?.idPaymentForm ??
+        raw?.eventPaymentForm?.idEventPaymentForm ??
+        raw?.eventPaymentForm?.idPaymentForm ??
+        raw?.paymentForm?.idPaymentForm ??
+        ""
+    ),
+    idClientEventManager: String(
+      raw?.idClientEventManager ?? raw?.clientEventManager?.idClientEventManager ?? ""
+    ),
+    idEventCoordinator: String(
+      raw?.idEventCoordinator ?? raw?.eventCoordinator?.idEventCoordinator ?? ""
+    ),
+    repetitiveEvent: Boolean(raw?.repetitiveEvent),
+    estimatedPax: String(raw?.estimatedPax ?? "0"),
+    realPax: String(raw?.realPax ?? "0"),
+    contractNumber: String(raw?.contractNumber ?? ""),
+    reference: String(raw?.reference ?? ""),
+    comments: String(raw?.comments ?? ""),
+    internalComments: String(raw?.internalComments ?? ""),
+    idExemption: String(raw?.idExemption ?? raw?.taxExemption?.idTaxExemption ?? ""),
+    idExtraTip: String(raw?.idExtraTip ?? raw?.extraTip?.idExtraTip ?? ""),
+    extraTipAmount: String(raw?.extraTipAmount ?? ""),
+    idContingency: String(raw?.idContingency ?? raw?.contingency?.idContingency ?? ""),
+    contingenciesAmount: String(raw?.contingenciesAmount ?? ""),
+    personalContract: Boolean(raw?.personalContract),
+    contractAlreadySigned: Boolean(raw?.contractAlreadySigned),
+    signatureDate: normalizeDateInput(raw?.signatureDate),
+    billingName: String(raw?.billingName ?? ""),
+    quoteExpirationDate: normalizeDateInput(raw?.quoteExpirationDate),
+    standsQuantity: String(raw?.standsQuantity ?? ""),
+    idCreationOper: String(raw?.idCreationOper ?? ""),
+    idEventStage: String(raw?.idEventStage ?? ""),
+    sustainable: Boolean(raw?.sustainable),
+    icca: Boolean(raw?.icca),
+  });
+
+  const updateEditField = (
+    field: keyof EditEventState,
+    value: string | boolean
+  ) => {
+    setEditState((prev) =>
+      prev
+        ? {
+            ...prev,
+            [field]: value,
+          }
+        : prev
+    );
+  };
+
+  const loadEditOptions = async () => {
+    setEditLoading(true);
+    setEditError(null);
+
+    const safeLoad = async <T,>(
+      label: string,
+      loader: () => Promise<T>,
+      fallback: T
+    ): Promise<T> => {
+      try {
+        const timeoutPromise = new Promise<T>((_resolve, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 15000)
+        );
+        return await Promise.race([loader(), timeoutPromise]);
+      } catch (err) {
+        console.warn(`loadOptions: ${label} fallo`, err);
+        return fallback;
+      }
+    };
+
+    try {
+      const [
+        clientData,
+        salesData,
+        segmentData,
+        subsegmentData,
+        eventTypeData,
+        subtypeData,
+        characterData,
+        sectorData,
+        sizeData,
+        paymentData,
+        taxData,
+        extraTipData,
+        contingencyData,
+      ] = await Promise.all([
+        safeLoad("clients", () => apiService.getClients(), []),
+        safeLoad("salesAgents", () => apiService.getSalesAgents(), []),
+        safeLoad(
+          "eventMarketSegments",
+          () => apiService.getEventMarketSegments(),
+          []
+        ),
+        safeLoad(
+          "eventMarketSubSegments",
+          () => apiService.getEventMarketSubSegments(),
+          []
+        ),
+        safeLoad("eventTypes", () => apiService.getEventTypes(), []),
+        safeLoad("eventSubTypes", () => apiService.getEventSubTypes(), []),
+        safeLoad("eventCharacters", () => apiService.getEventCharacters(), []),
+        safeLoad("eventSectors", () => apiService.getEventSectors(), []),
+        safeLoad("eventSizes", () => apiService.getEventSizes(), []),
+        safeLoad(
+          "eventPaymentForms",
+          () => apiService.getEventPaymentForms(),
+          []
+        ),
+        safeLoad("taxExemptions", () => apiService.getTaxExemptions(), []),
+        safeLoad("extraTips", () => apiService.getExtraTips(), []),
+        safeLoad("contingencies", () => apiService.getContingencies(), []),
+      ]);
+
+      const derivedSubsegments = (segmentData || []).flatMap((segment: any) =>
+        (segment.marketSubSegments || segment.eventMarketSubSegments || []).map(
+          (sub: any) => ({
+            ...sub,
+            idMarketSegment:
+              sub.idMarketSegment ??
+              segment.idMarketSegment ??
+              segment.idEventMarketSegment ??
+              segment.id,
+            marketSegmentName:
+              sub.marketSegmentName ??
+              segment.marketSegmentName ??
+              segment.eventMarketSegmentName ??
+              segment.name,
+          })
+        )
+      );
+
+      setClients(clientData || []);
+      setSalesAgents(salesData || []);
+      setEventTypes(eventTypeData || []);
+      setSegments(segmentData || []);
+      setSubsegments(
+        derivedSubsegments.length > 0
+          ? derivedSubsegments
+          : subsegmentData || []
+      );
+      setSubtypes(subtypeData || []);
+      setCharacters(
+        (characterData || []).map((item: any) => ({
+          id: String(item.id ?? item.idEventCharacter ?? ""),
+          name: item.name ?? item.eventCharacterName ?? "",
+        }))
+      );
+      setSectors(sectorData || []);
+      setSizes(sizeData || []);
+      setPaymentForms(paymentData || []);
+      setTaxExemptions(taxData || []);
+      setExtraTips(extraTipData || []);
+      setContingencies(contingencyData || []);
+      setEditOptionsLoaded(true);
+    } catch (err) {
+      console.error("Error cargando opciones del formulario:", err);
+      setEditError(
+        "No se pudieron cargar los datos de referencia. Verifica la conexion e intenta nuevamente."
+      );
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (event) {
+      setEditState(buildEditState(event as any));
+    }
+  }, [event]);
+
+  useEffect(() => {
+    if ((editOpen || event) && !editOptionsLoaded && !editLoading) {
+      loadEditOptions();
+    }
+  }, [editOpen, event, editOptionsLoaded, editLoading]);
+
+  useEffect(() => {
+    const idClientNumber = toNumberOrNull(editState?.idClient ?? "");
+    if (!idClientNumber) {
+      setClientManagers([]);
+      return;
+    }
+
+    let isMounted = true;
+    apiService
+      .getClientEventManagers(idClientNumber)
+      .then((data) => {
+        if (isMounted) setClientManagers(data || []);
+      })
+      .catch((err) => {
+        console.warn("Error cargando responsables del cliente:", err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [editState?.idClient]);
+
+  const sizeIdByLabel = useMemo(() => {
+    const normalize = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .replace(/[^A-Za-z0-9]+/g, "")
+        .toUpperCase()
+        .trim();
+
+    const resolveSizeCode = (raw: string) => {
+      const name = normalize(raw);
+      if (!name) return "";
+      if (
+        name.includes("XS") ||
+        name.includes("XSMALL") ||
+        name.includes("EXTRASMALL") ||
+        name.includes("EXTRAPEQUENO") ||
+        name.includes("EXTRAPEQUEN")
+      )
+        return "XS";
+      if (
+        name.includes("XL") ||
+        name.includes("XLARGE") ||
+        name.includes("EXTRALARGE") ||
+        name.includes("EXTRAGRANDE")
+      )
+        return "XL";
+      if (
+        name.includes("SMALL") ||
+        name.includes("PEQUENO") ||
+        name.includes("PEQUEN")
+      )
+        return "S";
+      if (name.includes("MEDIUM") || name.includes("MEDIANO")) return "M";
+      if (name.includes("LARGE") || name.includes("GRANDE")) return "L";
+      if (name === "S" || name === "M" || name === "L") return name;
+      return "";
+    };
+
+    const map = new Map<string, string>();
+    sizes.forEach((size: any) => {
+      const id = String(size.id ?? size.idEventSize ?? "");
+      const name = String(size.name ?? size.eventSizeName ?? "");
+      const code = resolveSizeCode(name);
+      if (id && code) {
+        map.set(code, id);
+      }
+    });
+    return map;
+  }, [sizes]);
+
+  const sizeRanges = useMemo(() => {
+    const normalize = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .toUpperCase();
+
+    return sizes
+      .map((size: any) => {
+        const id = String(size.id ?? size.idEventSize ?? "");
+        const name = String(size.name ?? size.eventSizeName ?? "");
+        if (!id || !name) return null;
+
+        const raw = normalize(name);
+        const numbers = raw.match(/\d+/g)?.map(Number) || [];
+        const hasPlus =
+          raw.includes("+") ||
+          raw.includes("MAS") ||
+          raw.includes("ADELANTE") ||
+          raw.includes("MAYOR") ||
+          raw.includes("DESDE") ||
+          raw.includes("MINIMO");
+        const hasUpperBound =
+          raw.includes("HASTA") ||
+          raw.includes("MENOS") ||
+          raw.includes("MAX") ||
+          raw.includes("MAXIMO");
+
+        if (numbers.length >= 2) {
+          const min = Math.min(numbers[0], numbers[1]);
+          const max = Math.max(numbers[0], numbers[1]);
+          return { id, min, max };
+        }
+
+        if (numbers.length === 1 && hasUpperBound) {
+          return { id, min: 0, max: numbers[0] };
+        }
+
+        if (numbers.length === 1 && hasPlus) {
+          return { id, min: numbers[0], max: Number.POSITIVE_INFINITY };
+        }
+
+        return null;
+      })
+      .filter((entry): entry is { id: string; min: number; max: number } =>
+        Boolean(entry)
+      );
+  }, [sizes]);
+
+  const segmentOptions = useMemo(() => {
+    const normalized = segments
+      .map((segment: any) => ({
+        id: String(
+          segment.id ?? segment.idMarketSegment ?? segment.idEventMarketSegment ?? ""
+        ),
+        name:
+          segment.name ??
+          segment.marketSegmentName ??
+          segment.eventMarketSegmentName ??
+          "",
+      }))
+      .filter((segment) => segment.id && segment.name.trim().length > 0);
+
+    if (normalized.length > 0) return normalized;
+
+    const derived = new Map<string, string>();
+    subsegments.forEach((sub: any) => {
+      const id = String(
+        sub.idMarketSegment ?? sub.idEventMarketSegment ?? sub.segmentId ?? ""
+      );
+      const name =
+        sub.marketSegmentName ??
+        sub.eventMarketSegmentName ??
+        sub.segmentName ??
+        "";
+      if (id && name && !derived.has(id)) {
+        derived.set(id, name);
+      }
+    });
+
+    return Array.from(derived.entries()).map(([id, name]) => ({ id, name }));
+  }, [segments, subsegments]);
+
+  const subsegmentOptions = useMemo(() => {
+    const normalized = subsegments
+      .map((sub: any) => ({
+        id: String(sub.idMarketSubSegment ?? sub.id ?? ""),
+        name:
+          sub.marketSubSegmentName ??
+          sub.eventMarketSubSegmentName ??
+          sub.subSegmentName ??
+          "",
+        segmentId: String(
+          sub.idMarketSegment ?? sub.idEventMarketSegment ?? sub.segmentId ?? ""
+        ),
+      }))
+      .filter((sub) => sub.id && sub.name.trim().length > 0);
+
+    if (normalized.length > 0) return normalized;
+
+    return segmentOptions.map((segment) => ({
+      id: segment.id,
+      name: segment.name,
+      segmentId: segment.id,
+    }));
+  }, [subsegments, segmentOptions]);
+
+  const eventTypeOptions = useMemo(() => {
+    const normalized = (eventTypes || [])
+      .map((type: any) => ({
+        id: String(type.idEventType ?? type.id ?? ""),
+        name: type.eventTypeName ?? type.name ?? "",
+      }))
+      .filter((type) => type.id && type.name.trim().length > 0);
+
+    if (normalized.length > 0) return normalized;
+
+    const derived = new Map<string, string>();
+    (subtypes || []).forEach((sub: any) => {
+      const id = String(sub.idEventType ?? sub.eventTypeId ?? "");
+      const name = sub.eventTypeName ?? "";
+      if (id && name && !derived.has(id)) {
+        derived.set(id, name);
+      }
+    });
+
+    return Array.from(derived.entries()).map(([id, name]) => ({ id, name }));
+  }, [eventTypes, subtypes]);
+
+  const subtypeOptions = useMemo(() => {
+    return (subtypes || [])
+      .map((sub: any) => ({
+        id: String(sub.idEventSubType ?? sub.id ?? ""),
+        name: sub.eventSubTypeName ?? sub.eventTypeName ?? sub.name ?? "",
+        typeId: String(sub.idEventType ?? sub.eventTypeId ?? ""),
+        subsegmentId: String(
+          sub.idMarketSubSegment ??
+            sub.idEventMarketSubSegment ??
+            sub.idEventSubsegment ??
+            sub.idEventSubSegment ??
+            sub.subSegmentId ??
+            ""
+        ),
+      }))
+      .filter((sub) => sub.id && sub.name.trim().length > 0);
+  }, [subtypes]);
+
+  useEffect(() => {
+    if (!event || !editOptionsLoaded) return;
+    const raw = event as any;
+    const eventSubtype = raw?.eventSubtype ?? raw?.eventSubType ?? null;
+    if (!eventSubtype) return;
+
+    const idRaw =
+      eventSubtype.idEventSubtype ??
+      eventSubtype.idEventSubType ??
+      eventSubtype.idSubType ??
+      "";
+    const idNumber = Number(idRaw);
+    const id = Number.isFinite(idNumber) ? idNumber : null;
+    const name =
+      eventSubtype.eventSubTypeName ??
+      eventSubtype.eventSubtypeName ??
+      eventSubtype.name ??
+      "";
+    if (!id || !name) return;
+
+    const updates: Partial<EditEventState> = {};
+    if (!editState?.idEventSubtype) {
+      updates.idEventSubtype = String(id);
+    }
+    if (!editState?.idEventType) {
+      const typeId =
+        eventSubtype.idEventType ?? eventSubtype.eventTypeId ?? null;
+      if (typeId) updates.idEventType = String(typeId);
+    }
+
+    setSubtypes((prev) => {
+      const exists = prev.some(
+        (item: any) => Number(item.idEventSubType ?? item.id ?? 0) === id
+      );
+      if (exists) return prev;
+      return [
+        ...prev,
+        {
+          idEventSubType: id,
+          eventSubTypeName: name,
+          idEventType: eventSubtype.idEventType ?? eventSubtype.eventTypeId ?? undefined,
+          idMarketSubSegment:
+            eventSubtype.idMarketSubSegment ??
+            eventSubtype.idEventMarketSubSegment ??
+            eventSubtype.idEventSubsegment ??
+            eventSubtype.idEventSubSegment ??
+            undefined,
+        },
+      ];
+    });
+
+    if (Object.keys(updates).length > 0) {
+      setEditState((prev) => (prev ? { ...prev, ...updates } : prev));
+    }
+  }, [event, editOptionsLoaded, editState]);
+
+  useEffect(() => {
+    if (!editOptionsLoaded || !event || !editState) return;
+
+    const raw = event as any;
+    const updates: Partial<EditEventState> = {};
+
+    const normalizeLookup = (value?: string | null) =>
+      (value ?? "")
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .replace(/[^A-Za-z0-9]+/g, " ")
+        .trim()
+        .toUpperCase();
+
+    const findIdByName = (
+      list: Array<{ id: string; name: string }>,
+      name?: string | null
+    ) => {
+      const target = normalizeLookup(name);
+      if (!target) return "";
+      return list.find((item) => normalizeLookup(item.name) === target)?.id ?? "";
+    };
+
+    if (!editState.idEventSegment) {
+      const segmentName =
+        raw?.marketSegmentName ??
+        raw?.eventMarketSegmentName ??
+        raw?.marketSegment?.marketSegmentName ??
+        raw?.eventMarketSegment?.marketSegmentName ??
+        null;
+      const segmentId = findIdByName(segmentOptions, segmentName);
+      if (segmentId) updates.idEventSegment = segmentId;
+    }
+
+    if (!editState.idEventSubsegment) {
+      const subsegmentName =
+        raw?.marketSubSegmentName ??
+        raw?.eventMarketSubSegmentName ??
+        raw?.marketSubSegment?.marketSubSegmentName ??
+        raw?.eventMarketSubSegment?.marketSubSegmentName ??
+        null;
+      const subsegmentId = findIdByName(subsegmentOptions, subsegmentName);
+      if (subsegmentId) updates.idEventSubsegment = subsegmentId;
+    }
+
+    if (!editState.idEventType) {
+      const typeName =
+        raw?.eventTypeName ??
+        raw?.eventType?.eventTypeName ??
+        raw?.eventType?.name ??
+        null;
+      const typeId = findIdByName(eventTypeOptions, typeName);
+      if (typeId) updates.idEventType = typeId;
+    }
+
+    if (!editState.idEventSubtype) {
+      const subtypeName =
+        raw?.eventSubTypeName ??
+        raw?.eventSubtypeName ??
+        raw?.eventSubType?.eventSubTypeName ??
+        raw?.eventSubType?.name ??
+        null;
+      const subtypeId = findIdByName(subtypeOptions, subtypeName);
+      if (subtypeId) updates.idEventSubtype = subtypeId;
+    }
+
+    if (!editState.idEventPaymentForm) {
+      const paymentName =
+        raw?.paymentFormName ??
+        raw?.eventPaymentFormName ??
+        raw?.eventPaymentFormDescription ??
+        raw?.paymentFormDescription ??
+        raw?.paymentForm?.paymentFormName ??
+        null;
+      const paymentId =
+        paymentForms.find(
+          (form) =>
+            normalizeLookup(form.paymentFormName) === normalizeLookup(paymentName)
+        )?.idPaymentForm ?? null;
+      if (paymentId) updates.idEventPaymentForm = String(paymentId);
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setEditState((prev) => (prev ? { ...prev, ...updates } : prev));
+    }
+  }, [
+    editOptionsLoaded,
+    event,
+    editState,
+    segmentOptions,
+    subsegmentOptions,
+    eventTypeOptions,
+    subtypeOptions,
+    paymentForms,
+  ]);
+
+  const hasSegmentMapping = useMemo(
+    () =>
+      subsegmentOptions.some(
+        (sub) => sub.segmentId && sub.segmentId.trim().length > 0
+      ),
+    [subsegmentOptions]
+  );
+
+  const hasTypeMapping = useMemo(
+    () => subtypeOptions.some((sub) => sub.typeId && sub.typeId.trim().length > 0),
+    [subtypeOptions]
+  );
+
+  const filteredSubsegments = useMemo(() => {
+    if (!editState?.idEventSegment) {
+      if (editState?.idEventSubsegment) return subsegmentOptions;
+      return hasSegmentMapping ? [] : subsegmentOptions;
+    }
+
+    if (!hasSegmentMapping) return subsegmentOptions;
+
+    return subsegmentOptions.filter(
+      (sub) =>
+        sub.segmentId === editState.idEventSegment ||
+        !sub.segmentId ||
+        sub.segmentId.trim().length === 0
+    );
+  }, [editState?.idEventSegment, subsegmentOptions, hasSegmentMapping]);
+
+  const filteredSubtypes = useMemo(() => {
+    if (!editState?.idEventType) {
+      if (editState?.idEventSubtype) return subtypeOptions;
+      return hasTypeMapping ? [] : subtypeOptions;
+    }
+
+    if (!hasTypeMapping) return subtypeOptions;
+
+    return subtypeOptions.filter(
+      (sub) =>
+        sub.typeId === editState.idEventType ||
+        !sub.typeId ||
+        sub.typeId.trim().length === 0
+    );
+  }, [editState?.idEventType, subtypeOptions, hasTypeMapping]);
+
+  useEffect(() => {
+    if (!editState?.idEventSegment) {
+      if (editState?.idEventSubsegment && hasSegmentMapping) {
+        updateEditField("idEventSubsegment", "");
+      }
+      return;
+    }
+
+    const stillValid = filteredSubsegments.some(
+      (sub) => sub.id === editState.idEventSubsegment
+    );
+    if (!stillValid && editState?.idEventSubsegment) {
+      updateEditField("idEventSubsegment", "");
+    }
+  }, [
+    editState?.idEventSegment,
+    editState?.idEventSubsegment,
+    filteredSubsegments,
+    hasSegmentMapping,
+  ]);
+
+  useEffect(() => {
+    if (!editState?.idEventType) {
+      if (editState?.idEventSubtype && hasTypeMapping) {
+        updateEditField("idEventSubtype", "");
+      }
+      return;
+    }
+
+    const stillValid = filteredSubtypes.some(
+      (sub) => sub.id === editState.idEventSubtype
+    );
+    if (!stillValid && editState?.idEventSubtype) {
+      updateEditField("idEventSubtype", "");
+    }
+  }, [
+    editState?.idEventType,
+    editState?.idEventSubtype,
+    filteredSubtypes,
+    hasTypeMapping,
+  ]);
+
+  useEffect(() => {
+    const paxValue = Number(editState?.estimatedPax ?? "");
+    if (Number.isNaN(paxValue) || !editState) return;
+
+    let sizeLabel = "";
+    if (paxValue >= 0 && paxValue <= 100) sizeLabel = "XS";
+    else if (paxValue >= 101 && paxValue <= 500) sizeLabel = "S";
+    else if (paxValue >= 501 && paxValue <= 1500) sizeLabel = "M";
+    else if (paxValue >= 1501 && paxValue <= 2500) sizeLabel = "L";
+    else if (paxValue >= 2501) sizeLabel = "XL";
+
+    let sizeId = sizeIdByLabel.get(sizeLabel) || "";
+    if (!sizeId && sizeRanges.length > 0) {
+      const match = sizeRanges.find(
+        (range) => paxValue >= range.min && paxValue <= range.max
+      );
+      sizeId = match?.id || "";
+    }
+    if (sizeId && sizeId !== editState.idEventSize) {
+      updateEditField("idEventSize", sizeId);
+    }
+  }, [editState?.estimatedPax, editState?.idEventSize, sizeIdByLabel, sizeRanges]);
+
+  const handleUpdateEvent = async () => {
+    if (!editState) return;
+    setEditError(null);
+    setEditSuccess(null);
+
+    const eventNumberValue = Number(
+      (event as any)?.eventNumber ?? eventIdentifier ?? 0
+    );
+    if (!eventNumberValue) {
+      setEditError("No se pudo determinar el numero del evento.");
+      return;
+    }
+
+    setEditSaving(true);
+
+    try {
+      const eventPayload = {
+        idEvent: toNumberOrNull(String((event as any)?.idEvent ?? "")),
+        title: editState.title.trim(),
+        description: toStringOrNull(editState.description),
+        startDate: editState.startDate,
+        endDate: editState.endDate,
+        idClient: toNumberOrNull(editState.idClient),
+        idCurrency: toNumberOrNull(editState.idCurrency) ?? 3,
+        discountPercentage: toNumberOrNull(editState.discountPercentage),
+        idSalesAgent: toNumberOrNull(editState.idSalesAgent),
+        idEventSubsegment: toNumberOrNull(editState.idEventSubsegment),
+        idEventType: toNumberOrNull(editState.idEventType),
+        idEventSubtype: toNumberOrNull(editState.idEventSubtype),
+        idEventCharacter: toNumberOrNull(editState.idEventCharacter),
+        idEventSector: toNumberOrNull(editState.idEventSector),
+        idEventSize: toNumberOrNull(editState.idEventSize),
+        idEventPaymentForm: toNumberOrNull(editState.idEventPaymentForm),
+        idClientEventManager: toNumberOrNull(editState.idClientEventManager),
+        idEventCoordinator: toNumberOrNull(editState.idEventCoordinator),
+        repetitiveEvent: editState.repetitiveEvent,
+        estimatedPax: toNumberOrNull(editState.estimatedPax) ?? 0,
+        realPax: toNumberOrNull(editState.realPax) ?? 0,
+        contractNumber: toStringOrNull(editState.contractNumber),
+        reference: toStringOrNull(editState.reference),
+        comments: toStringOrNull(editState.comments),
+        internalComments: toStringOrNull(editState.internalComments),
+        idExemption: toNumberOrNull(editState.idExemption),
+        idExtraTip: toNumberOrNull(editState.idExtraTip),
+        extraTipAmount: toNumberOrNull(editState.extraTipAmount),
+        idContingency: toNumberOrNull(editState.idContingency),
+        contingenciesAmount: toNumberOrNull(editState.contingenciesAmount),
+        personalContract: editState.personalContract,
+        contractAlreadySigned: editState.contractAlreadySigned,
+        signatureDate: toStringOrNull(editState.signatureDate),
+        billingName: toStringOrNull(editState.billingName),
+        quoteExpirationDate: toStringOrNull(editState.quoteExpirationDate),
+        standsQuantity: toNumberOrNull(editState.standsQuantity),
+        idCreationOper: toNumberOrNull(editState.idCreationOper),
+        idEventStage: toNumberOrNull(editState.idEventStage),
+        sustainable: editState.sustainable,
+        icca: editState.icca,
+      };
+
+      await apiService.updateEvent(eventNumberValue, eventPayload);
+      setEditSuccess("Evento actualizado correctamente.");
+      sessionStorage.removeItem("currentEvent");
+      await loadEventDetails(String(eventNumberValue));
+    } catch (err) {
+      console.error("Error actualizando evento:", err);
+      setEditError(
+        err instanceof Error ? err.message : "No se pudo actualizar el evento."
+      );
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -292,10 +1182,37 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
     null;
   const marketSubSegmentName =
     rawEvent?.marketSubSegmentName ??
+    rawEvent?.marketSubsegmentName ??
     rawEvent?.marketSubSegment?.marketSubSegmentName ??
     rawEvent?.eventMarketSubSegmentName ??
+    rawEvent?.eventMarketSubsegmentName ??
     rawEvent?.eventMarketSubSegment?.marketSubSegmentName ??
     rawEvent?.marketSubSegment?.name ??
+    null;
+  const eventTypeName =
+    rawEvent?.eventType?.eventTypeName ??
+    rawEvent?.eventTypeName ??
+    rawEvent?.eventType?.name ??
+    null;
+  const eventSubtypeName =
+    rawEvent?.eventSubType?.eventSubTypeName ??
+    rawEvent?.eventSubtype?.eventSubTypeName ??
+    rawEvent?.eventSubtype?.eventSubtypeName ??
+    rawEvent?.eventSubtype?.name ??
+    rawEvent?.eventSubtypeName ??
+    rawEvent?.eventSubTypeName ??
+    rawEvent?.eventSubType?.eventSubtypeName ??
+    rawEvent?.eventSubType?.name ??
+    null;
+  const eventCharacterName =
+    rawEvent?.eventCharacter?.eventCharacterName ??
+    rawEvent?.eventCharacterName ??
+    rawEvent?.eventCharacter?.name ??
+    null;
+  const eventSectorName =
+    rawEvent?.eventSector?.eventSectorName ??
+    rawEvent?.eventSectorName ??
+    rawEvent?.eventSector?.name ??
     null;
   const eventSizeName =
     rawEvent?.eventSizeName ??
@@ -303,6 +1220,113 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
     rawEvent?.eventSize?.name ??
     rawEvent?.size?.eventSizeName ??
     null;
+  const paymentFormName =
+    rawEvent?.paymentForm?.paymentFormName ??
+    rawEvent?.paymentFormName ??
+    rawEvent?.eventPaymentFormName ??
+    rawEvent?.eventPaymentFormDescription ??
+    rawEvent?.paymentFormDescription ??
+    rawEvent?.paymentForm?.paymentFormDescription ??
+    null;
+
+  const normalizeLookup = (value?: string | null) =>
+    (value ?? "")
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/[^A-Za-z0-9]+/g, " ")
+      .trim()
+      .toUpperCase();
+
+  const findById = (list: Array<{ id: string; name: string }>, id?: string) => {
+    if (!id) return null;
+    return list.find((item) => item.id === id) ?? null;
+  };
+
+  const findByName = (
+    list: Array<{ id: string; name: string }>,
+    name?: string | null
+  ) => {
+    const target = normalizeLookup(name);
+    if (!target) return null;
+    return (
+      list.find((item) => normalizeLookup(item.name) === target) ?? null
+    );
+  };
+
+  const fallbackSegmentName =
+    marketSegmentName ||
+    findById(segmentOptions, String(rawEvent?.idEventSegment ?? ""))?.name ||
+    findById(segmentOptions, String(rawEvent?.idMarketSegment ?? ""))?.name ||
+    findByName(segmentOptions, rawEvent?.marketSegmentName)?.name ||
+    null;
+  const fallbackSubsegmentName =
+    marketSubSegmentName ||
+    findById(subsegmentOptions, String(rawEvent?.idEventSubsegment ?? ""))?.name ||
+    findById(subsegmentOptions, String(rawEvent?.idEventSubSegment ?? ""))?.name ||
+    findById(subsegmentOptions, String(rawEvent?.idEventMarketSubSegment ?? ""))?.name ||
+    findById(subsegmentOptions, String(rawEvent?.idMarketSubSegment ?? ""))?.name ||
+    findByName(subsegmentOptions, rawEvent?.marketSubSegmentName)?.name ||
+    findByName(subsegmentOptions, rawEvent?.eventMarketSubSegmentName)?.name ||
+    null;
+  const fallbackEventTypeName =
+    eventTypeName ||
+    findById(eventTypeOptions, String(rawEvent?.idEventType ?? ""))?.name ||
+    findByName(eventTypeOptions, rawEvent?.eventTypeName)?.name ||
+    null;
+  const fallbackEventSubtypeName =
+    eventSubtypeName ||
+    findById(subtypeOptions, String(rawEvent?.idEventSubtype ?? ""))?.name ||
+    findById(subtypeOptions, String(rawEvent?.idEventSubType ?? ""))?.name ||
+    findById(subtypeOptions, String(rawEvent?.eventSubtype?.idEventSubtype ?? ""))?.name ||
+    findByName(subtypeOptions, rawEvent?.eventSubTypeName)?.name ||
+    findByName(subtypeOptions, rawEvent?.eventSubtype?.eventSubTypeName)?.name ||
+    null;
+  const fallbackPaymentFormName =
+    paymentFormName ||
+    paymentForms.find(
+      (form) =>
+        String(form.idPaymentForm ?? "") ===
+          String(rawEvent?.idEventPaymentForm ?? "") ||
+        String(form.idPaymentForm ?? "") === String(rawEvent?.idPaymentForm ?? "")
+    )?.paymentFormName ||
+    paymentForms.find(
+      (form) =>
+        normalizeLookup(form.paymentFormName) ===
+        normalizeLookup(rawEvent?.paymentFormName ?? rawEvent?.eventPaymentFormName)
+    )?.paymentFormName ||
+    null;
+  const taxExemptionName =
+    rawEvent?.taxExemption?.taxExemptionName ??
+    rawEvent?.taxExemptionName ??
+    rawEvent?.exemptionName ??
+    null;
+  const contingencyName =
+    rawEvent?.contingency?.contingencyName ??
+    rawEvent?.contingencyName ??
+    null;
+  const extraTipName =
+    rawEvent?.extraTip?.extraTipName ??
+    rawEvent?.extraTipName ??
+    null;
+  const quoteExpirationDate =
+    rawEvent?.quoteExpirationDate ??
+    rawEvent?.quoteExpiration ??
+    rawEvent?.quoteExpiresOn ??
+    null;
+  const standsQuantity =
+    rawEvent?.standsQuantity ?? rawEvent?.standsQty ?? rawEvent?.stands ?? null;
+  const discountPercentage =
+    rawEvent?.discountPercentage ?? rawEvent?.discountPercent ?? null;
+  const hasStandsQuantity =
+    standsQuantity !== null &&
+    standsQuantity !== undefined &&
+    String(standsQuantity).trim() !== "";
+  const hasDiscountPercentage =
+    discountPercentage !== null &&
+    discountPercentage !== undefined &&
+    String(discountPercentage).trim() !== "";
+  const hasRepetitiveEvent =
+    rawEvent?.repetitiveEvent !== undefined && rawEvent?.repetitiveEvent !== null;
 
   const isICCA =
     rawEvent?.icca === true ||
@@ -353,7 +1377,816 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
               </div>
             </div>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => setEditOpen((prev) => !prev)}
+          >
+            {editOpen ? "Cerrar edicion" : "Editar Evento"}
+          </Button>
         </div>
+
+        {editOpen && editState && (
+          <div className="space-y-4">
+            {editError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                {editError}
+              </div>
+            )}
+
+            {editSuccess && (
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-600">
+                {editSuccess}
+              </div>
+            )}
+
+            <Dialog open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
+              <DialogContent>
+                <DialogHeader onClose={() => setClientSearchOpen(false)}>
+                  <div>
+                    <DialogTitle>Buscar cliente</DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Selecciona el cliente de Skill para el evento.
+                    </p>
+                  </div>
+                </DialogHeader>
+                <DialogBody className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={clientSearchQuery}
+                      onInput={(e) =>
+                        setClientSearchQuery(
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Buscar por nombre, codigo o ID"
+                    />
+                    <Button variant="outline" size="icon" aria-label="Buscar">
+                      <Search className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="max-h-[360px] overflow-y-auto space-y-2">
+                    {clients
+                      .filter((client) => {
+                        const query = clientSearchQuery.trim().toLowerCase();
+                        if (!query) return true;
+                        const name =
+                          client.clientName ||
+                          client.tradeName ||
+                          client.legalName ||
+                          "";
+                        const code = client.clientCode || "";
+                        const id = client.idClient ? String(client.idClient) : "";
+                        return (
+                          name.toLowerCase().includes(query) ||
+                          code.toLowerCase().includes(query) ||
+                          id.includes(query)
+                        );
+                      })
+                      .slice(0, 100)
+                      .map((client) => (
+                        <button
+                          key={
+                            client.idClient ??
+                            client.clientCode ??
+                            client.clientName
+                          }
+                          className="w-full rounded-md border border-border p-3 text-left hover:bg-accent transition-colors"
+                          onClick={() => {
+                            updateEditField(
+                              "idClient",
+                              String(client.idClient ?? "")
+                            );
+                            setClientSearchOpen(false);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium">
+                                {client.clientName ||
+                                  client.tradeName ||
+                                  "Cliente"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {client.clientCode || ""}{" "}
+                                {client.idClient ? `#${client.idClient}` : ""}
+                              </p>
+                            </div>
+                            <span className="text-xs text-primary">
+                              Seleccionar
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+
+                    {clients.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No hay clientes disponibles.
+                      </p>
+                    )}
+                  </div>
+                </DialogBody>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setClientSearchOpen(false)}
+                  >
+                    Cerrar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={managerSearchOpen} onOpenChange={setManagerSearchOpen}>
+              <DialogContent>
+                <DialogHeader onClose={() => setManagerSearchOpen(false)}>
+                  <div>
+                    <DialogTitle>Buscar responsable</DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Selecciona el responsable de cuenta para el evento.
+                    </p>
+                  </div>
+                </DialogHeader>
+                <DialogBody className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={managerSearchQuery}
+                      onInput={(e) =>
+                        setManagerSearchQuery(
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Buscar por nombre, correo o ID"
+                    />
+                    <Button variant="outline" size="icon" aria-label="Buscar">
+                      <Search className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="max-h-[360px] overflow-y-auto space-y-2">
+                    {clientManagers
+                      .filter((manager) => {
+                        const query = managerSearchQuery.trim().toLowerCase();
+                        if (!query) return true;
+                        const name = manager.clientEventManagerName || "";
+                        const email = manager.clientEventManagerEmail || "";
+                        const phone = manager.clientEventManagerPhone || "";
+                        const id = manager.idClientEventManager
+                          ? String(manager.idClientEventManager)
+                          : "";
+                        return (
+                          name.toLowerCase().includes(query) ||
+                          email.toLowerCase().includes(query) ||
+                          phone.toLowerCase().includes(query) ||
+                          id.includes(query)
+                        );
+                      })
+                      .slice(0, 100)
+                      .map((manager) => (
+                        <button
+                          key={
+                            manager.idClientEventManager ??
+                            manager.clientEventManagerEmail ??
+                            manager.clientEventManagerName
+                          }
+                          className="w-full rounded-md border border-border p-3 text-left hover:bg-accent transition-colors"
+                          onClick={() => {
+                            updateEditField(
+                              "idClientEventManager",
+                              String(manager.idClientEventManager ?? "")
+                            );
+                            setManagerSearchOpen(false);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium">
+                                {manager.clientEventManagerName ||
+                                  manager.clientEventManagerEmail ||
+                                  "Responsable"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {manager.clientEventManagerEmail || ""}
+                                {manager.idClientEventManager
+                                  ? ` #${manager.idClientEventManager}`
+                                  : ""}
+                              </p>
+                            </div>
+                            <span className="text-xs text-primary">
+                              Seleccionar
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+
+                    {clientManagers.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No hay responsables disponibles.
+                      </p>
+                    )}
+                  </div>
+                </DialogBody>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setManagerSearchOpen(false)}
+                  >
+                    Cerrar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Editar Evento</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {editLoading && (
+                  <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
+                    <Spinner size="sm" />
+                    <span className="text-muted-foreground">
+                      Cargando parametros del formulario...
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Titulo</label>
+                    <Input
+                      value={editState.title}
+                      onInput={(e) =>
+                        updateEditField(
+                          "title",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Titulo del evento"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Cliente</label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Select
+                        className="flex-1"
+                        value={editState.idClient}
+                        onChange={(e) =>
+                          updateEditField(
+                            "idClient",
+                            (e.target as HTMLSelectElement).value
+                          )
+                        }
+                      >
+                        <option value="">Selecciona un cliente</option>
+                        {clients.map((client) => (
+                          <option
+                            key={client.idClient}
+                            value={String(client.idClient ?? "")}
+                          >
+                            {client.clientName || client.tradeName || "Cliente"}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        variant="outline"
+                        onClick={() => setClientSearchOpen(true)}
+                      >
+                        Buscar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Descripcion</label>
+                  <Textarea
+                    value={editState.description}
+                    onInput={(e) =>
+                      updateEditField(
+                        "description",
+                        (e.target as HTMLTextAreaElement).value
+                      )
+                    }
+                    placeholder="Descripcion del evento"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Fecha inicio</label>
+                    <DatePicker
+                      value={editState.startDate}
+                      onInput={(e) =>
+                        updateEditField(
+                          "startDate",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Fecha fin</label>
+                    <DatePicker
+                      value={editState.endDate}
+                      onInput={(e) =>
+                        updateEditField(
+                          "endDate",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Coordinador de cuenta
+                    </label>
+                    <Select
+                      value={editState.idSalesAgent}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idSalesAgent",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona coordinador</option>
+                      {salesAgents.map((agent) => (
+                        <option
+                          key={agent.idSalesAgent}
+                          value={String(agent.idSalesAgent)}
+                        >
+                          {agent.salesAgentName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">PAX estimado</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={editState.estimatedPax}
+                      onInput={(e) =>
+                        updateEditField(
+                          "estimatedPax",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Cantidad estimada"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">PAX real</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={editState.realPax}
+                      onInput={(e) =>
+                        updateEditField(
+                          "realPax",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Cantidad real"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Cantidad de stands
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={editState.standsQuantity}
+                      onInput={(e) =>
+                        updateEditField(
+                          "standsQuantity",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Cantidad de stands"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Segmento</label>
+                    <Select
+                      value={editState.idEventSegment}
+                      onChange={(e) => {
+                        const value = (e.target as HTMLSelectElement).value;
+                        updateEditField("idEventSegment", value);
+                        updateEditField("idEventSubsegment", "");
+                      }}
+                    >
+                      <option value="">Selecciona segmento</option>
+                      {segmentOptions.map((segment) => (
+                        <option key={segment.id} value={segment.id}>
+                          {segment.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Subsegmento</label>
+                    <Select
+                      value={editState.idEventSubsegment}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idEventSubsegment",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                      disabled={
+                        hasSegmentMapping &&
+                        !editState.idEventSegment &&
+                        !editState.idEventSubsegment
+                      }
+                    >
+                      <option value="">
+                        {hasSegmentMapping &&
+                        !editState.idEventSegment &&
+                        !editState.idEventSubsegment
+                          ? "Selecciona segmento primero"
+                          : "Selecciona subsegmento"}
+                      </option>
+                      {filteredSubsegments.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Tipo del evento</label>
+                    <Select
+                      value={editState.idEventType}
+                      onChange={(e) => {
+                        updateEditField(
+                          "idEventType",
+                          (e.target as HTMLSelectElement).value
+                        );
+                        updateEditField("idEventSubtype", "");
+                      }}
+                    >
+                      <option value="">Selecciona tipo</option>
+                      {eventTypeOptions.map((type) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Subtipo</label>
+                    <Select
+                      value={editState.idEventSubtype}
+                      disabled={
+                        hasTypeMapping &&
+                        !editState.idEventType &&
+                        !editState.idEventSubtype
+                      }
+                      onChange={(e) =>
+                        updateEditField(
+                          "idEventSubtype",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">
+                        {hasTypeMapping &&
+                        !editState.idEventType &&
+                        !editState.idEventSubtype
+                          ? "Selecciona tipo primero"
+                          : "Selecciona subtipo"}
+                      </option>
+                      {filteredSubtypes.map((subtype) => (
+                        <option key={subtype.id} value={subtype.id}>
+                          {subtype.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Caracter</label>
+                    <Select
+                      value={editState.idEventCharacter}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idEventCharacter",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona caracter</option>
+                      {characters.map((character) => (
+                        <option key={character.id} value={character.id}>
+                          {character.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Sector</label>
+                    <Select
+                      value={editState.idEventSector}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idEventSector",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona sector</option>
+                      {sectors.map((sector: any) => (
+                        <option
+                          key={sector.id ?? sector.idEventSector}
+                          value={String(sector.id ?? sector.idEventSector)}
+                        >
+                          {sector.name ?? sector.eventSectorName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Responsable de la Cuenta
+                    </label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Select
+                        className="flex-1"
+                        value={editState.idClientEventManager}
+                        onChange={(e) =>
+                          updateEditField(
+                            "idClientEventManager",
+                            (e.target as HTMLSelectElement).value
+                          )
+                        }
+                      >
+                        <option value="">Selecciona responsable</option>
+                        {clientManagers.map((manager) => (
+                          <option
+                            key={manager.idClientEventManager}
+                            value={String(manager.idClientEventManager)}
+                          >
+                            {manager.clientEventManagerName ||
+                              manager.clientEventManagerEmail ||
+                              "Responsable"}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        variant="outline"
+                        onClick={() => setManagerSearchOpen(true)}
+                      >
+                        Buscar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Tamaño</label>
+                    <Select
+                      value={editState.idEventSize}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idEventSize",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona tamaño</option>
+                      {sizes.map((size: any) => (
+                        <option
+                          key={size.id ?? size.idEventSize}
+                          value={String(size.id ?? size.idEventSize)}
+                        >
+                          {size.name ?? size.eventSizeName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Fecha vencimiento cotizacion
+                    </label>
+                    <DatePicker
+                      value={editState.quoteExpirationDate}
+                      onInput={(e) =>
+                        updateEditField(
+                          "quoteExpirationDate",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Impuestos</label>
+                    <Select
+                      value={editState.idExemption}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idExemption",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona impuestos</option>
+                      {taxExemptions.map((ex) => (
+                        <option
+                          key={ex.idTaxExemption}
+                          value={String(ex.idTaxExemption)}
+                        >
+                          {ex.taxExemptionName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Imprevisto</label>
+                    <Select
+                      value={editState.idContingency}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idContingency",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona imprevisto</option>
+                      {contingencies.map((cont) => (
+                        <option
+                          key={cont.idContingency}
+                          value={String(cont.idContingency)}
+                        >
+                          {cont.contingencyName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Propina</label>
+                    <Select
+                      value={editState.idExtraTip}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idExtraTip",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona propina</option>
+                      {extraTips.map((tip) => (
+                        <option
+                          key={tip.idExtraTip}
+                          value={String(tip.idExtraTip)}
+                        >
+                          {tip.extraTipName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Forma de pago</label>
+                    <Select
+                      value={editState.idEventPaymentForm}
+                      onChange={(e) =>
+                        updateEditField(
+                          "idEventPaymentForm",
+                          (e.target as HTMLSelectElement).value
+                        )
+                      }
+                    >
+                      <option value="">Selecciona forma de pago</option>
+                      {paymentForms.map((form) => (
+                        <option
+                          key={form.idPaymentForm}
+                          value={String(form.idPaymentForm)}
+                        >
+                          {form.paymentFormName}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Evento repetitivo</label>
+                    <div className="flex h-10 items-center gap-3 rounded-md border border-slate-200/70 bg-slate-50 px-3 text-sm shadow-sm dark:border-slate-800/70 dark:bg-slate-900/40">
+                      <input
+                        type="checkbox"
+                        className="accent-slate-600"
+                        checked={editState.repetitiveEvent}
+                        onChange={(e) =>
+                          updateEditField(
+                            "repetitiveEvent",
+                            (e.target as HTMLInputElement).checked
+                          )
+                        }
+                      />
+                      <span>Evento repetitivo</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Referencia</label>
+                    <Input
+                      value={editState.reference}
+                      onInput={(e) =>
+                        updateEditField(
+                          "reference",
+                          (e.target as HTMLInputElement).value
+                        )
+                      }
+                      placeholder="Referencia"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Atributos</label>
+                    <div className="flex h-10 w-full items-center gap-4 rounded-md border border-slate-200/70 bg-slate-50 px-3 text-sm shadow-sm dark:border-slate-800/70 dark:bg-slate-900/40">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="accent-slate-600"
+                          checked={editState.sustainable}
+                          onChange={(e) =>
+                            updateEditField(
+                              "sustainable",
+                              (e.target as HTMLInputElement).checked
+                            )
+                          }
+                        />
+                        Evento sostenible
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="accent-slate-600"
+                          checked={editState.icca}
+                          onChange={(e) =>
+                            updateEditField(
+                              "icca",
+                              (e.target as HTMLInputElement).checked
+                            )
+                          }
+                        />
+                        Evento ICCA
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Comentarios internos
+                  </label>
+                  <Textarea
+                    value={editState.internalComments}
+                    onInput={(e) =>
+                      updateEditField(
+                        "internalComments",
+                        (e.target as HTMLTextAreaElement).value
+                      )
+                    }
+                    placeholder="Comentarios internos"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleUpdateEvent} disabled={editSaving}>
+                    {editSaving ? (
+                      <Spinner size="sm" className="border-t-white border-white/30" />
+                    ) : (
+                      "Guardar cambios"
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Contenido del evento */}
         <div className="space-y-6">
@@ -376,35 +2209,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 </div>
               )}
 
-              {/* Row 1: Segmento / Subsegmento / Tamaño */}
-              {(marketSegmentName || marketSubSegmentName || eventSizeName) && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Segmento de Mercado
-                    </p>
-                    <p className="text-sm mt-1">{marketSegmentName || "-"}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Subsegmento
-                    </p>
-                    <p className="text-sm mt-1">
-                      {marketSubSegmentName || "-"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Tamaño del Evento
-                    </p>
-                    <p className="text-sm mt-1">{eventSizeName || "-"}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Row 2: Fechas y Estatus */}
+              {/* Row 1: Fechas y Estatus */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
@@ -446,7 +2251,74 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 </div>
               </div>
 
-              {/* Row 3: PAX / Contrato / Referencia */}
+              <div className="h-px w-full bg-border/70" />
+
+              {/* Row 2: Segmento / Subsegmento / Tamaño */}
+              {(fallbackSegmentName || fallbackSubsegmentName || eventSizeName) && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Segmento de Mercado
+                    </p>
+                    <p className="text-sm mt-1">{fallbackSegmentName || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Subsegmento
+                    </p>
+                    <p className="text-sm mt-1">
+                      {fallbackSubsegmentName || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Tamano del Evento
+                    </p>
+                    <p className="text-sm mt-1">{eventSizeName || "-"}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="h-px w-full bg-border/70" />
+
+              {/* Row 3: Tipo / Subtipo / Caracter / Sector */}
+              {(fallbackEventTypeName || fallbackEventSubtypeName || eventCharacterName || eventSectorName) && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Tipo de Evento
+                    </p>
+                    <p className="text-sm mt-1">{fallbackEventTypeName || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Subtipo
+                    </p>
+                    <p className="text-sm mt-1">{fallbackEventSubtypeName || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Caracter
+                    </p>
+                    <p className="text-sm mt-1">{eventCharacterName || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Sector
+                    </p>
+                    <p className="text-sm mt-1">{eventSectorName || "-"}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="h-px w-full bg-border/70" />
+
+              {/* Row 4: PAX / Stands / Repetitivo */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
@@ -469,30 +2341,107 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 </div>
 
                 <div>
-                  {(event as any)?.contractNumber && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Contrato
-                      </p>
-                      <p className="text-sm mt-1">
-                        {(event as any).contractNumber}
-                      </p>
-                    </div>
-                  )}
-                  {(event as any)?.reference && (
-                    <div
-                      className={`${
-                        (event as any).contractNumber ? "pt-2" : ""
-                      }`}
-                    >
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Referencia
-                      </p>
-                      <p className="text-sm mt-1">{(event as any).reference}</p>
-                    </div>
-                  )}
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Cantidad de Stands
+                  </p>
+                  <p className="text-sm mt-1">
+                    {hasStandsQuantity ? String(standsQuantity) : "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Evento Repetitivo
+                  </p>
+                  <p className="text-sm mt-1">
+                    {hasRepetitiveEvent
+                      ? rawEvent?.repetitiveEvent
+                        ? "Si"
+                        : "No"
+                      : "-"}
+                  </p>
                 </div>
               </div>
+
+              <div className="h-px w-full bg-border/70" />
+
+              {/* Row 5: Contrato / Referencia / Descuento / Vencimiento */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Contrato
+                  </p>
+                  <p className="text-sm mt-1">
+                    {(event as any)?.contractNumber || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Referencia
+                  </p>
+                  <p className="text-sm mt-1">
+                    {(event as any)?.reference || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Descuento (%)
+                  </p>
+                  <p className="text-sm mt-1">
+                    {hasDiscountPercentage ? String(discountPercentage) : "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Vencimiento de Cotizacion
+                  </p>
+                  <p className="text-sm mt-1">
+                    {quoteExpirationDate
+                      ? formatDateLocal(quoteExpirationDate)
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="h-px w-full bg-border/70" />
+
+              {/* Row 6: Forma de pago / Impuestos / Imprevisto / Propina */}
+              {(fallbackPaymentFormName || taxExemptionName || contingencyName || extraTipName) && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Forma de Pago
+                    </p>
+                    <p className="text-sm mt-1">{fallbackPaymentFormName || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Impuestos
+                    </p>
+                    <p className="text-sm mt-1">{taxExemptionName || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Imprevisto
+                    </p>
+                    <p className="text-sm mt-1">{contingencyName || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Propina
+                    </p>
+                    <p className="text-sm mt-1">{extraTipName || "-"}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="h-px w-full bg-border/70" />
 
               {/* Row 4: ICCA / Sostenible */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
@@ -527,6 +2476,8 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     )}
                   </div>
                 </div>
+
+                <div aria-hidden="true" />
               </div>
             </CardContent>
           </Card>

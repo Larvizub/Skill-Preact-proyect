@@ -1322,6 +1322,92 @@ export const apiService = {
       }
     ),
 
+  // Actualizar evento
+  updateEvent: async (
+    eventNumber: number,
+    eventPayload: Record<string, unknown>
+  ) => {
+    const mergedPayload = {
+      ...eventPayload,
+      eventNumber,
+    };
+    const attempts: Array<() => Promise<any>> = [
+      () =>
+        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+          `/events/event/${eventNumber}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              Event: mergedPayload,
+            }),
+          }
+        ),
+      () =>
+        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+          `/events/event/${eventNumber}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(mergedPayload),
+          }
+        ),
+      () =>
+        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+          "/events/event",
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              Event: mergedPayload,
+            }),
+          }
+        ),
+      () =>
+        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+          "/events/event",
+          {
+            method: "PUT",
+            body: JSON.stringify(mergedPayload),
+          }
+        ),
+      () =>
+        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+          "/UpdateEvent",
+          {
+            method: "POST",
+            body: buildPayload({
+              Event: mergedPayload,
+            }),
+          }
+        ),
+      () =>
+        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+          "/UpdateEvent",
+          {
+            method: "POST",
+            body: buildPayload(mergedPayload),
+          }
+        ),
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const attempt of attempts) {
+      try {
+        const response = await attempt();
+        if ((response as any)?.success === false) {
+          lastError = new Error(
+            (response as any)?.message || "No se pudo actualizar el evento."
+          );
+          continue;
+        }
+        return response;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+
+    throw lastError || new Error("No se pudo actualizar el evento.");
+  },
+
   // Crear actividad dentro de un evento
   addEventActivity: async (
     eventNumber: number,
