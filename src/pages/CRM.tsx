@@ -255,9 +255,6 @@ const STAGE_BADGE_CLASS: Record<OpportunityStage, string> = {
   perdida: "bg-destructive/10 text-destructive",
 };
 
-const CHECKBOX_INPUT_CLASS =
-  "h-4 w-4 rounded border border-input bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
-
 type CheckboxFieldProps = {
   label: string;
   checked: boolean;
@@ -266,16 +263,18 @@ type CheckboxFieldProps = {
 
 function CheckboxField({ label, checked, onChange }: CheckboxFieldProps) {
   return (
-    <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-      <input
-        type="checkbox"
-        className={CHECKBOX_INPUT_CLASS}
-        checked={checked}
-        onChange={(event) =>
-          onChange((event.target as HTMLInputElement).checked)
-        }
-      />
-      {label}
+    <label className="cursor-pointer select-none">
+      <div className="flex h-10 items-center gap-3 rounded-md border border-slate-200/70 bg-slate-50 px-3 text-sm shadow-sm dark:border-slate-800/70 dark:bg-slate-900/40">
+        <input
+          type="checkbox"
+          className="accent-slate-600"
+          checked={checked}
+          onChange={(event) =>
+            onChange((event.target as HTMLInputElement).checked)
+          }
+        />
+        <span>{label}</span>
+      </div>
     </label>
   );
 }
