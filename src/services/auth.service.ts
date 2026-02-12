@@ -1,10 +1,3 @@
-// Configuración de la API
-// Construir baseURL según entorno: si defines VITE_API_BASE en build se usa;
-// por defecto usar `/api` para que Firebase Hosting reescriba a la Cloud Function proxy.
-
-// Determina la baseURL en este orden:
-// 1. `VITE_API_BASE` (build-time env var)
-// 2. Si no está, usar `/api` para que Vite/dev o el hosting puedan reenviar a la API real
 const resolvedBaseURL = import.meta.env.VITE_API_BASE || "/api";
 
 export type Recinto = "CCCR" | "CCCI" | "CEVP";
