@@ -137,6 +137,16 @@ const BUILDING_BLOCK_OPTIONS: SelectOption[] = [
   { value: "Licitación", label: "Licitación" },
 ];
 
+const OPPORTUNITY_SEGMENT_OPTIONS: SelectOption[] = [
+  { value: "Asociativo", label: "Asociativo" },
+  { value: "Corporativo", label: "Corporativo" },
+  { value: "Gubernamental", label: "Gubernamental" },
+  {
+    value: "Otros Clientes: Persona Natural",
+    label: "Otros Clientes: Persona Natural",
+  },
+];
+
 const TERRITORY_OPTIONS: SelectOption[] = [
   {
     value: "Centro de Convenciones de Costar Rica",
@@ -430,7 +440,6 @@ export function CRM() {
   const [form, setForm] = useState<OpportunityFormState>(createDefaultForm());
 
   const [salesOwnerOptions, setSalesOwnerOptions] = useState<SelectOption[]>([]);
-  const [segmentOptions, setSegmentOptions] = useState<SelectOption[]>([]);
   const [eventTypeOptions, setEventTypeOptions] = useState<SelectOption[]>([]);
   const [eventSizeOptions, setEventSizeOptions] = useState<SelectOption[]>([]);
   const [eventSectorOptions, setEventSectorOptions] = useState<SelectOption[]>([]);
@@ -514,10 +523,9 @@ export function CRM() {
     const loadLookups = async () => {
       setLoadingLookups(true);
       try {
-        const [salesAgents, segments, eventTypes, eventSizes, eventSectors, setupTypes] =
+        const [salesAgents, eventTypes, eventSizes, eventSectors, setupTypes] =
           await Promise.all([
             apiService.getSalesAgents().catch(() => []),
-            apiService.getEventMarketSegments().catch(() => []),
             apiService.getEventTypes().catch(() => []),
             apiService.getEventSizes().catch(() => []),
             apiService.getEventSectors().catch(() => []),
@@ -530,18 +538,6 @@ export function CRM() {
           (salesAgents as any[])
             .map((item) =>
               extractOption(item, ["idSalesAgent", "id"], ["salesAgentName", "name"])
-            )
-            .filter(Boolean) as SelectOption[]
-        );
-
-        setSegmentOptions(
-          (segments as any[])
-            .map((item) =>
-              extractOption(
-                item,
-                ["idMarketSubSegment", "id", "idEventSubsegment"],
-                ["marketSubSegmentName", "name", "eventMarketSegmentName"]
-              )
             )
             .filter(Boolean) as SelectOption[]
         );
@@ -614,13 +610,6 @@ export function CRM() {
       return moneda === "USD" ? acc + valor : acc;
     }, 0);
 
-    const totalCOP = opportunities.reduce((acc, op) => {
-      const infoBasica = (op.details?.infoBasica as Record<string, unknown>) || {};
-      const moneda = String(infoBasica.moneda || "");
-      const valor = parseNumber(infoBasica.valorOportunidad ?? op.estimatedValue);
-      return moneda === "COP" ? acc + valor : acc;
-    }, 0);
-
     const iccaEvents = opportunities.filter((op) => {
       const infoBasica = (op.details?.infoBasica as Record<string, unknown>) || {};
       return Boolean(infoBasica.eventoICCA);
@@ -677,7 +666,6 @@ export function CRM() {
 
     return {
       totalUSD,
-      totalCOP,
       iccaEvents,
       sustainableEvents,
       avgAttendees,
@@ -996,7 +984,7 @@ export function CRM() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -1026,24 +1014,6 @@ export function CRM() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <CircleDollarSign className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Oportunidades COP</p>
-                  <p className="text-2xl font-semibold">
-                    {new Intl.NumberFormat("es-CO", {
-                      style: "currency",
-                      currency: "COP",
-                      maximumFractionDigits: 0,
-                    }).format(stats.totalCOP)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
                 <Percent className="h-5 w-5 text-primary" />
                 <div>
                   <p className="text-sm text-muted-foreground">ICCA / Sostenible</p>
@@ -1060,8 +1030,10 @@ export function CRM() {
               <div className="flex items-center gap-3">
                 <Target className="h-5 w-5 text-primary" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Promedio asistentes</p>
-                  <p className="text-2xl font-semibold">{Math.round(stats.avgAttendees)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Oportunidades cotizadas en Skill
+                  </p>
+                  <p className="text-2xl font-semibold">{stats.quotedInSkill}</p>
                 </div>
               </div>
             </CardContent>
@@ -1470,12 +1442,12 @@ export function CRM() {
                           "opportunitySegmentId",
                           "opportunitySegmentName",
                           (event.target as HTMLSelectElement).value,
-                          segmentOptions
+                          OPPORTUNITY_SEGMENT_OPTIONS
                         )
                       }
                     >
                       <option value="">Seleccionar</option>
-                      {segmentOptions.map((option) => (
+                      {OPPORTUNITY_SEGMENT_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
