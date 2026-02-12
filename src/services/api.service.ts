@@ -1325,84 +1325,307 @@ export const apiService = {
   // Actualizar evento
   updateEvent: async (
     eventNumber: number,
-    eventPayload: Record<string, unknown>
+    eventPayload: Record<string, unknown>,
+    idEvent?: number,
+    options?: {
+      stopOnFirstSuccess?: boolean;
+    }
   ) => {
+    const resolvedIdEvent =
+      idEvent ??
+      (typeof (eventPayload as any)?.idEvent === "number"
+        ? ((eventPayload as any).idEvent as number)
+        : undefined);
+
     const mergedPayload = {
       ...eventPayload,
       eventNumber,
+      ...(resolvedIdEvent ? { idEvent: resolvedIdEvent } : {}),
     };
-    const attempts: Array<() => Promise<any>> = [
-      () =>
-        apiRequest<{ success?: boolean; result?: null; message?: string }>(
-          `/events/event/${eventNumber}`,
+
+    const compact = (value: any): any => {
+      if (Array.isArray(value)) {
+        return value.map(compact);
+      }
+      if (value && typeof value === "object") {
+        const entries = Object.entries(value)
+          .filter(([, v]) => v !== null && v !== undefined && v !== "")
+          .map(([k, v]) => [k, compact(v)] as const);
+        return Object.fromEntries(entries);
+      }
+      return value;
+    };
+
+    const compactPayload = compact(mergedPayload);
+
+    const stopOnFirstSuccess = options?.stopOnFirstSuccess ?? true;
+
+    type UpdateAttempt = {
+      name: string;
+      run: () => Promise<any>;
+    };
+
+    const attempt = (name: string, run: () => Promise<any>): UpdateAttempt => ({
+      name,
+      run,
+    });
+
+    const attempts: UpdateAttempt[] = [];
+
+    const successes: Array<{ attempt: string; response: any }> = [];
+
+    const addJsonAttempt = (
+      name: string,
+      endpoint: string,
+      method: string,
+      body: unknown
+    ) => {
+      attempts.push(
+        attempt(name, () =>
+          apiRequest<{ success?: boolean; result?: any; message?: string }>(
+            endpoint,
+            {
+              method,
+              body: JSON.stringify(body),
+            }
+          )
+        )
+      );
+    };
+
+    // 1) Por idEvent (si existe)
+    if (resolvedIdEvent) {
+      addJsonAttempt(
+        "POST /events/event/{idEvent} (Event wrapper)",
+        `/events/event/${resolvedIdEvent}`,
+        "POST",
+        { Event: compactPayload }
+      );
+      addJsonAttempt(
+        "POST /events/event/{idEvent} (raw)",
+        `/events/event/${resolvedIdEvent}`,
+        "POST",
+        compactPayload
+      );
+      addJsonAttempt(
+        "PUT /events/event/{idEvent} (Event wrapper)",
+        `/events/event/${resolvedIdEvent}`,
+        "PUT",
+        { Event: compactPayload }
+      );
+      addJsonAttempt(
+        "PUT /events/event/{idEvent} (raw)",
+        `/events/event/${resolvedIdEvent}`,
+        "PUT",
+        compactPayload
+      );
+      addJsonAttempt(
+        "PATCH /events/event/{idEvent} (Event wrapper)",
+        `/events/event/${resolvedIdEvent}`,
+        "PATCH",
+        { Event: compactPayload }
+      );
+    }
+
+    // 2) Por eventNumber
+    addJsonAttempt(
+      "POST /events/event/{eventNumber} (Event wrapper)",
+      `/events/event/${eventNumber}`,
+      "POST",
+      { Event: compactPayload }
+    );
+    addJsonAttempt(
+      "POST /events/event/{eventNumber} (raw)",
+      `/events/event/${eventNumber}`,
+      "POST",
+      compactPayload
+    );
+    addJsonAttempt(
+      "PUT /events/event/{eventNumber} (Event wrapper)",
+      `/events/event/${eventNumber}`,
+      "PUT",
+      { Event: compactPayload }
+    );
+    addJsonAttempt(
+      "PUT /events/event/{eventNumber} (raw)",
+      `/events/event/${eventNumber}`,
+      "PUT",
+      compactPayload
+    );
+
+    // 3) Rutas alternativas que algunas instalaciones exponen
+    addJsonAttempt(
+      "POST /events/updateevent (Event wrapper)",
+      "/events/updateevent",
+      "POST",
+      { Event: compactPayload }
+    );
+    addJsonAttempt(
+      "POST /events/UpdateEvent (Event wrapper)",
+      "/events/UpdateEvent",
+      "POST",
+      { Event: compactPayload }
+    );
+    addJsonAttempt(
+      "POST /events/event/update (Event wrapper)",
+      "/events/event/update",
+      "POST",
+      { Event: compactPayload }
+    );
+
+    // 4) /events/event sin id (algunas APIs actualizan si viene idEvent/eventNumber en body)
+    addJsonAttempt(
+      "POST /events/event (Event wrapper)",
+      "/events/event",
+      "POST",
+      { Event: compactPayload }
+    );
+    // Algunas implementaciones exigen companyAuthId/idData dentro del JSON (además de headers)
+    attempts.push(
+      attempt("POST /events/event (buildPayload + Event wrapper)", () =>
+        apiRequest<{ success?: boolean; result?: any; message?: string }>(
+          "/events/event",
           {
-            method: "PUT",
-            body: JSON.stringify({
-              Event: mergedPayload,
-            }),
+            method: "POST",
+            body: buildPayload({ Event: compactPayload }),
           }
-        ),
-      () =>
-        apiRequest<{ success?: boolean; result?: null; message?: string }>(
-          `/events/event/${eventNumber}`,
+        )
+      )
+    );
+    addJsonAttempt(
+      "POST /events/event (raw)",
+      "/events/event",
+      "POST",
+      compactPayload
+    );
+    attempts.push(
+      attempt("POST /events/event (buildPayload raw)", () =>
+        apiRequest<{ success?: boolean; result?: any; message?: string }>(
+          "/events/event",
           {
-            method: "PUT",
-            body: JSON.stringify(mergedPayload),
+            method: "POST",
+            body: buildPayload(compactPayload),
           }
-        ),
-      () =>
-        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+        )
+      )
+    );
+    addJsonAttempt(
+      "PUT /events/event (Event wrapper)",
+      "/events/event",
+      "PUT",
+      { Event: compactPayload }
+    );
+    attempts.push(
+      attempt("PUT /events/event (buildPayload + Event wrapper)", () =>
+        apiRequest<{ success?: boolean; result?: any; message?: string }>(
           "/events/event",
           {
             method: "PUT",
-            body: JSON.stringify({
-              Event: mergedPayload,
-            }),
+            body: buildPayload({ Event: compactPayload }),
           }
-        ),
-      () =>
-        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+        )
+      )
+    );
+    addJsonAttempt(
+      "PUT /events/event (raw)",
+      "/events/event",
+      "PUT",
+      compactPayload
+    );
+    attempts.push(
+      attempt("PUT /events/event (buildPayload raw)", () =>
+        apiRequest<{ success?: boolean; result?: any; message?: string }>(
           "/events/event",
           {
             method: "PUT",
-            body: JSON.stringify(mergedPayload),
+            body: buildPayload(compactPayload),
           }
-        ),
-      () =>
-        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+        )
+      )
+    );
+
+    // 5) Legacy /UpdateEvent con buildPayload (incluye companyAuthId/idData)
+    attempts.push(
+      attempt("POST /UpdateEvent (buildPayload + Event wrapper)", () =>
+        apiRequest<{ success?: boolean; result?: any; message?: string }>(
           "/UpdateEvent",
           {
             method: "POST",
             body: buildPayload({
-              Event: mergedPayload,
+              Event: compactPayload,
             }),
           }
-        ),
-      () =>
-        apiRequest<{ success?: boolean; result?: null; message?: string }>(
+        )
+      )
+    );
+    attempts.push(
+      attempt("POST /UpdateEvent (buildPayload raw)", () =>
+        apiRequest<{ success?: boolean; result?: any; message?: string }>(
           "/UpdateEvent",
           {
             method: "POST",
-            body: buildPayload(mergedPayload),
+            body: buildPayload(compactPayload),
           }
-        ),
-    ];
+        )
+      )
+    );
 
     let lastError: Error | null = null;
 
-    for (const attempt of attempts) {
+    for (const currentAttempt of attempts) {
       try {
-        const response = await attempt();
+        const response = await currentAttempt.run();
+
         if ((response as any)?.success === false) {
           lastError = new Error(
             (response as any)?.message || "No se pudo actualizar el evento."
           );
           continue;
         }
-        return response;
+
+        if (
+          typeof (response as any)?.errorCode === "number" &&
+          (response as any).errorCode !== 0
+        ) {
+          lastError = new Error(
+            (response as any)?.message ||
+              `No se pudo actualizar el evento (errorCode ${(response as any).errorCode}).`
+          );
+          continue;
+        }
+
+        const hasExplicitSuccess = typeof (response as any)?.success === "boolean";
+        const hasResult = (response as any)?.result !== undefined;
+        const hasErrorCode = typeof (response as any)?.errorCode === "number";
+        const isOk =
+          (hasExplicitSuccess && (response as any).success === true) ||
+          hasResult ||
+          (hasErrorCode && (response as any).errorCode === 0);
+
+        if (isOk) {
+          console.info("updateEvent: success", {
+            attempt: currentAttempt.name,
+            eventNumber,
+            idEvent: resolvedIdEvent,
+            response,
+          });
+          successes.push({ attempt: currentAttempt.name, response });
+          if (stopOnFirstSuccess) {
+            return { attempt: currentAttempt.name, response };
+          }
+          continue;
+        }
+
+        lastError = new Error(
+          `Respuesta inesperada al actualizar el evento (${currentAttempt.name}).`
+        );
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
       }
+    }
+
+    if (!stopOnFirstSuccess && successes.length > 0) {
+      return { attempts: successes };
     }
 
     throw lastError || new Error("No se pudo actualizar el evento.");

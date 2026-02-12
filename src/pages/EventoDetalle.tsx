@@ -395,10 +395,17 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
       raw?.idEventSegment ??
         raw?.marketSegment?.idMarketSegment ??
         raw?.eventMarketSegment?.idMarketSegment ??
+        raw?.eventSubtype?.idEventSegment ??
         raw?.idMarketSegment ??
         ""
     ),
-    idEventType: String(raw?.idEventType ?? raw?.eventType?.idEventType ?? ""),
+    idEventType: String(
+      raw?.idEventType ??
+        raw?.eventType?.idEventType ??
+        raw?.eventSubtype?.idEventType ??
+        raw?.eventSubType?.idEventType ??
+        ""
+    ),
     idEventSubtype: String(
       raw?.idEventSubtype ??
         raw?.idEventSubType ??
@@ -612,105 +619,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
     };
   }, [editState?.idClient]);
 
-  const sizeIdByLabel = useMemo(() => {
-    const normalize = (value: string) =>
-      value
-        .normalize("NFD")
-        .replace(/\p{Diacritic}/gu, "")
-        .replace(/[^A-Za-z0-9]+/g, "")
-        .toUpperCase()
-        .trim();
-
-    const resolveSizeCode = (raw: string) => {
-      const name = normalize(raw);
-      if (!name) return "";
-      if (
-        name.includes("XS") ||
-        name.includes("XSMALL") ||
-        name.includes("EXTRASMALL") ||
-        name.includes("EXTRAPEQUENO") ||
-        name.includes("EXTRAPEQUEN")
-      )
-        return "XS";
-      if (
-        name.includes("XL") ||
-        name.includes("XLARGE") ||
-        name.includes("EXTRALARGE") ||
-        name.includes("EXTRAGRANDE")
-      )
-        return "XL";
-      if (
-        name.includes("SMALL") ||
-        name.includes("PEQUENO") ||
-        name.includes("PEQUEN")
-      )
-        return "S";
-      if (name.includes("MEDIUM") || name.includes("MEDIANO")) return "M";
-      if (name.includes("LARGE") || name.includes("GRANDE")) return "L";
-      if (name === "S" || name === "M" || name === "L") return name;
-      return "";
-    };
-
-    const map = new Map<string, string>();
-    sizes.forEach((size: any) => {
-      const id = String(size.id ?? size.idEventSize ?? "");
-      const name = String(size.name ?? size.eventSizeName ?? "");
-      const code = resolveSizeCode(name);
-      if (id && code) {
-        map.set(code, id);
-      }
-    });
-    return map;
-  }, [sizes]);
-
-  const sizeRanges = useMemo(() => {
-    const normalize = (value: string) =>
-      value
-        .normalize("NFD")
-        .replace(/\p{Diacritic}/gu, "")
-        .toUpperCase();
-
-    return sizes
-      .map((size: any) => {
-        const id = String(size.id ?? size.idEventSize ?? "");
-        const name = String(size.name ?? size.eventSizeName ?? "");
-        if (!id || !name) return null;
-
-        const raw = normalize(name);
-        const numbers = raw.match(/\d+/g)?.map(Number) || [];
-        const hasPlus =
-          raw.includes("+") ||
-          raw.includes("MAS") ||
-          raw.includes("ADELANTE") ||
-          raw.includes("MAYOR") ||
-          raw.includes("DESDE") ||
-          raw.includes("MINIMO");
-        const hasUpperBound =
-          raw.includes("HASTA") ||
-          raw.includes("MENOS") ||
-          raw.includes("MAX") ||
-          raw.includes("MAXIMO");
-
-        if (numbers.length >= 2) {
-          const min = Math.min(numbers[0], numbers[1]);
-          const max = Math.max(numbers[0], numbers[1]);
-          return { id, min, max };
-        }
-
-        if (numbers.length === 1 && hasUpperBound) {
-          return { id, min: 0, max: numbers[0] };
-        }
-
-        if (numbers.length === 1 && hasPlus) {
-          return { id, min: numbers[0], max: Number.POSITIVE_INFINITY };
-        }
-
-        return null;
-      })
-      .filter((entry): entry is { id: string; min: number; max: number } =>
-        Boolean(entry)
-      );
-  }, [sizes]);
 
   const segmentOptions = useMemo(() => {
     const normalized = segments
@@ -809,6 +717,33 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
       }))
       .filter((sub) => sub.id && sub.name.trim().length > 0);
   }, [subtypes]);
+
+  useEffect(() => {
+    if (!editOptionsLoaded || !editState) return;
+    const updates: Partial<EditEventState> = {};
+
+    if (editState.idEventSubsegment && !editState.idEventSegment) {
+      const match = subsegmentOptions.find(
+        (sub) => sub.id === editState.idEventSubsegment
+      );
+      if (match?.segmentId) {
+        updates.idEventSegment = match.segmentId;
+      }
+    }
+
+    if (editState.idEventSubtype && !editState.idEventType) {
+      const match = subtypeOptions.find(
+        (sub) => sub.id === editState.idEventSubtype
+      );
+      if (match?.typeId) {
+        updates.idEventType = match.typeId;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setEditState((prev) => (prev ? { ...prev, ...updates } : prev));
+    }
+  }, [editOptionsLoaded, editState, subsegmentOptions, subtypeOptions]);
 
   useEffect(() => {
     if (!event || !editOptionsLoaded) return;
@@ -1009,9 +944,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
   useEffect(() => {
     if (!editState?.idEventSegment) {
-      if (editState?.idEventSubsegment && hasSegmentMapping) {
-        updateEditField("idEventSubsegment", "");
-      }
       return;
     }
 
@@ -1030,9 +962,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
   useEffect(() => {
     if (!editState?.idEventType) {
-      if (editState?.idEventSubtype && hasTypeMapping) {
-        updateEditField("idEventSubtype", "");
-      }
       return;
     }
 
@@ -1049,37 +978,13 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
     hasTypeMapping,
   ]);
 
-  useEffect(() => {
-    const paxValue = Number(editState?.estimatedPax ?? "");
-    if (Number.isNaN(paxValue) || !editState) return;
-
-    let sizeLabel = "";
-    if (paxValue >= 0 && paxValue <= 100) sizeLabel = "XS";
-    else if (paxValue >= 101 && paxValue <= 500) sizeLabel = "S";
-    else if (paxValue >= 501 && paxValue <= 1500) sizeLabel = "M";
-    else if (paxValue >= 1501 && paxValue <= 2500) sizeLabel = "L";
-    else if (paxValue >= 2501) sizeLabel = "XL";
-
-    let sizeId = sizeIdByLabel.get(sizeLabel) || "";
-    if (!sizeId && sizeRanges.length > 0) {
-      const match = sizeRanges.find(
-        (range) => paxValue >= range.min && paxValue <= range.max
-      );
-      sizeId = match?.id || "";
-    }
-    if (sizeId && sizeId !== editState.idEventSize) {
-      updateEditField("idEventSize", sizeId);
-    }
-  }, [editState?.estimatedPax, editState?.idEventSize, sizeIdByLabel, sizeRanges]);
 
   const handleUpdateEvent = async () => {
     if (!editState) return;
     setEditError(null);
     setEditSuccess(null);
 
-    const eventNumberValue = Number(
-      (event as any)?.eventNumber ?? eventIdentifier ?? 0
-    );
+    const eventNumberValue = Number((event as any)?.eventNumber ?? 0);
     if (!eventNumberValue) {
       setEditError("No se pudo determinar el numero del evento.");
       return;
@@ -1131,10 +1036,122 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
         icca: editState.icca,
       };
 
-      await apiService.updateEvent(eventNumberValue, eventPayload);
-      setEditSuccess("Evento actualizado correctamente.");
-      sessionStorage.removeItem("currentEvent");
-      await loadEventDetails(String(eventNumberValue));
+      const idEventValue = Number((event as any)?.idEvent ?? 0) || undefined;
+      const updateResult = await apiService.updateEvent(
+        eventNumberValue,
+        eventPayload,
+        idEventValue,
+        { stopOnFirstSuccess: false }
+      );
+
+      // Verificar persistencia: recargar el evento y comparar campos clave.
+      const normalizeText = (value: unknown) => String(value ?? "").trim();
+      const normalizeDate = (value: unknown) => {
+        const raw = String(value ?? "");
+        return raw.includes("T") ? raw.split("T")[0] : raw;
+      };
+
+      const fetchByIdentifier = async (identifier: string) => {
+        const list = await apiService.getEvents(undefined, undefined, identifier);
+        if (!Array.isArray(list) || list.length === 0) return null;
+        return (
+          list.find(
+            (item: any) =>
+              String(item?.eventNumber) === identifier ||
+              String(item?.idEvent) === identifier
+          ) || list[0]
+        );
+      };
+
+      const computeMismatches = (refreshed: any) => {
+        const mismatches: string[] = [];
+        if (normalizeText(refreshed?.title) !== normalizeText(editState.title)) {
+          mismatches.push("titulo");
+        }
+        const expectedDescription = normalizeText(editState.description);
+        if (expectedDescription) {
+          const gotDescription = normalizeText(refreshed?.description);
+          if (gotDescription !== expectedDescription) {
+            mismatches.push("descripcion");
+          }
+        }
+        if (normalizeDate(refreshed?.startDate) !== normalizeDate(editState.startDate)) {
+          mismatches.push("fecha inicio");
+        }
+        if (normalizeDate(refreshed?.endDate) !== normalizeDate(editState.endDate)) {
+          mismatches.push("fecha fin");
+        }
+
+        const expectedPax = Number(editState.estimatedPax);
+        if (!Number.isNaN(expectedPax)) {
+          const gotPax = Number(refreshed?.estimatedPax);
+          if (!Number.isNaN(gotPax) && gotPax !== expectedPax) {
+            mismatches.push("pax estimado");
+          }
+        }
+
+        const expectedInternal = normalizeText(editState.internalComments);
+        if (expectedInternal) {
+          const gotInternal = normalizeText(refreshed?.internalComments);
+          if (gotInternal !== expectedInternal) {
+            mismatches.push("comentarios internos");
+          }
+        }
+        return mismatches;
+      };
+
+      const successAttempts: Array<{ attempt: string }> = Array.isArray(
+        (updateResult as any)?.attempts
+      )
+        ? (updateResult as any).attempts
+        : (updateResult as any)?.attempt
+        ? [{ attempt: (updateResult as any).attempt }]
+        : [];
+
+      let finalRefreshed: any | null = null;
+      let finalMismatches: string[] = [];
+      let finalAttempt = successAttempts[successAttempts.length - 1]?.attempt || "desconocido";
+
+      // Tras cada update exitoso, intentar verificar persistencia.
+      for (const success of successAttempts) {
+        finalAttempt = success.attempt;
+        // Pequeño delay para evitar consistencia eventual/caches intermedios.
+        await new Promise((r) => setTimeout(r, 500));
+
+        const refreshedByEventNumber = await fetchByIdentifier(String(eventNumberValue));
+        const refreshed =
+          refreshedByEventNumber ??
+          (idEventValue ? await fetchByIdentifier(String(idEventValue)) : null);
+
+        if (!refreshed) {
+          finalRefreshed = null;
+          finalMismatches = ["no se pudo recargar evento"];
+          continue;
+        }
+
+        finalRefreshed = refreshed;
+        finalMismatches = computeMismatches(refreshed);
+
+        if (finalMismatches.length === 0) {
+          setEditSuccess(`Evento actualizado correctamente. (${finalAttempt})`);
+          setEvent(refreshed as any);
+          sessionStorage.setItem("currentEvent", JSON.stringify(refreshed));
+          return;
+        }
+      }
+
+      // Ningún intento logró persistir.
+      setEditSuccess(null);
+      setEditError(
+        `La API respondió, pero al recargar el evento no aparecen los cambios (${finalMismatches.join(
+          ", "
+        )}). Ultimo intento: ${finalAttempt}.`
+      );
+      if (finalRefreshed) {
+        setEvent(finalRefreshed as any);
+        sessionStorage.setItem("currentEvent", JSON.stringify(finalRefreshed));
+      }
+      return;
     } catch (err) {
       console.error("Error actualizando evento:", err);
       setEditError(
