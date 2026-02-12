@@ -71,8 +71,8 @@ interface EventFormState {
   contingenciesAmount: string;
   personalContract: boolean;
   contractAlreadySigned: boolean;
-  signatureDate: string; // Eliminar logica
-  billingName: string; // Eliminar logica
+  signatureDate: string;
+  billingName: string;
   quoteExpirationDate: string;
   standsQuantity: string;
   idCreationOper: string; 
