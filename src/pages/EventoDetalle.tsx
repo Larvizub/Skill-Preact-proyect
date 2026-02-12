@@ -1172,10 +1172,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
         finalMismatches = computeMismatches(refreshed);
 
         if (finalMismatches.length === 0) {
-          showTopNotice(
-            `Evento actualizado correctamente. (${finalAttempt})`,
-            "success"
-          );
+          showTopNotice("El evento ha sido actualizado correctamente", "success");
           setEvent(refreshed as any);
           sessionStorage.setItem("currentEvent", JSON.stringify(refreshed));
           return;
