@@ -57,11 +57,10 @@ export function ParqueosEventos() {
 
   const [loading, setLoading] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
-  const [filterType, setFilterType] = useState<
-    "dateRange" | "eventId" | "eventName"
-  >("dateRange");
+  const [filterType, setFilterType] = useState<"dateRange" | "eventId">(
+    "dateRange"
+  );
   const [eventId, setEventId] = useState("");
-  const [eventName, setEventName] = useState("");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
     return now.toISOString().split("T")[0];
@@ -83,10 +82,6 @@ export function ParqueosEventos() {
     // Validar que haya criterios de búsqueda
     if (filterType === "eventId" && !eventId.trim()) {
       alert("Por favor ingresa un ID de evento");
-      return;
-    }
-    if (filterType === "eventName" && !eventName.trim()) {
-      alert("Por favor ingresa un nombre de evento");
       return;
     }
     if (filterType === "dateRange" && (!startDate || !endDate)) {
@@ -119,18 +114,11 @@ export function ParqueosEventos() {
       let foundEvents: Event[];
       if (filterType === "dateRange") {
         foundEvents = await apiService.getEvents(startDate, endDate);
-      } else if (filterType === "eventId") {
-        foundEvents = await apiService.getEvents(
-          undefined,
-          undefined,
-          eventId.trim()
-        );
       } else {
         foundEvents = await apiService.getEvents(
           undefined,
           undefined,
-          undefined,
-          eventName.trim()
+          eventId.trim()
         );
       }
 
@@ -185,7 +173,6 @@ export function ParqueosEventos() {
 
   const clearFilters = () => {
     setEventId("");
-    setEventName("");
     // Resetear todos los filtros a true (todos visibles)
     const resetFilters: Record<StatusCategory, boolean> = {} as any;
     STATUS_DEFINITIONS.forEach((def) => (resetFilters[def.id] = true));
@@ -341,14 +328,6 @@ export function ParqueosEventos() {
                 <Search className="w-4 h-4 mr-2" />
                 Por ID
               </Button>
-              <Button
-                variant={filterType === "eventName" ? "default" : "outline"}
-                onClick={() => setFilterType("eventName")}
-                size="sm"
-              >
-                <Search className="w-4 h-4 mr-2" />
-                Por Nombre
-              </Button>
             </div>
           </div>
 
@@ -384,20 +363,6 @@ export function ParqueosEventos() {
                   value={eventId}
                   onChange={(e) =>
                     setEventId((e.target as HTMLInputElement).value)
-                  }
-                />
-              </div>
-            )}
-
-            {filterType === "eventName" && (
-              <div>
-                <Label htmlFor="eventName">Nombre del Evento</Label>
-                <Input
-                  id="eventName"
-                  placeholder="Ingresa el nombre del evento"
-                  value={eventName}
-                  onChange={(e) =>
-                    setEventName((e.target as HTMLInputElement).value)
                   }
                 />
               </div>

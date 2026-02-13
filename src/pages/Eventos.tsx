@@ -12,7 +12,6 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Spinner } from "../components/ui/spinner";
 import { Label } from "../components/ui/label";
-import { Select } from "../components/ui/select";
 import { DatePicker } from "../components/ui/datepicker";
 import {
   Table,
@@ -201,11 +200,10 @@ export function Eventos() {
   }, []);
 
   // Filtros
-  const [filterType, setFilterType] = useState<
-    "dateRange" | "eventNumber" | "eventName"
-  >("dateRange");
+  const [filterType, setFilterType] = useState<"dateRange" | "eventNumber">(
+    "dateRange"
+  );
   const [eventNumber, setEventNumber] = useState("");
-  const [eventName, setEventName] = useState("");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -221,10 +219,6 @@ export function Eventos() {
     // Validar que haya criterios de búsqueda
     if (filterType === "eventNumber" && !eventNumber.trim()) {
       alert("Por favor ingresa un ID de evento");
-      return;
-    }
-    if (filterType === "eventName" && !eventName.trim()) {
-      alert("Por favor ingresa un nombre de evento");
       return;
     }
     if (filterType === "dateRange" && (!startDate || !endDate)) {
@@ -276,13 +270,6 @@ export function Eventos() {
           undefined,
           undefined,
           eventNumber.trim()
-        );
-      } else if (filterType === "eventName") {
-        data = await apiService.getEvents(
-          undefined,
-          undefined,
-          undefined,
-          eventName.trim()
         );
       } else {
         data = await apiService.getEvents();
@@ -357,7 +344,6 @@ export function Eventos() {
 
   const clearFilters = () => {
     setEventNumber("");
-    setEventName("");
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -568,8 +554,8 @@ export function Eventos() {
           <div>
             <h1 className="text-3xl font-bold">Eventos</h1>
             <p className="text-muted-foreground">
-              Busca eventos por ID (Skill), nombre o rango de fechas (máximo 6
-              meses para búsqueda por fechas)
+              Busca eventos por ID (Skill) o rango de fechas (máximo 6 meses
+              para búsqueda por fechas)
             </p>
           </div>
           <Button onClick={() => route("/eventos/crear")}>Crear evento</Button>
@@ -586,24 +572,28 @@ export function Eventos() {
           <CardContent>
             <div className="space-y-4">
               {/* Tipo de Filtro */}
-              <div className="grid gap-2">
-                <Label htmlFor="filterType">Buscar por</Label>
-                <Select
-                  id="filterType"
-                  value={filterType}
-                  onChange={(e) =>
-                    setFilterType(
-                      (e.target as HTMLSelectElement).value as
-                        | "dateRange"
-                        | "eventNumber"
-                        | "eventName"
-                    )
-                  }
-                >
-                  <option value="dateRange">Rango de Fechas</option>
-                  <option value="eventNumber">ID del Evento (Skill)</option>
-                  <option value="eventName">Nombre del Evento</option>
-                </Select>
+              <div className="mb-1">
+                <Label className="text-sm font-medium mb-2 block">
+                  Tipo de Búsqueda
+                </Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={filterType === "dateRange" ? "default" : "outline"}
+                    onClick={() => setFilterType("dateRange")}
+                    size="sm"
+                  >
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Por Rango de Fechas
+                  </Button>
+                  <Button
+                    variant={filterType === "eventNumber" ? "default" : "outline"}
+                    onClick={() => setFilterType("eventNumber")}
+                    size="sm"
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    Por ID
+                  </Button>
+                </div>
               </div>
 
               {/* Campos según el tipo de filtro */}
@@ -648,24 +638,6 @@ export function Eventos() {
                       value={eventNumber}
                       onInput={(e) =>
                         setEventNumber((e.target as HTMLInputElement).value)
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-
-              {filterType === "eventName" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="eventName">Nombre del Evento</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="eventName"
-                      placeholder="Buscar por nombre..."
-                      className="pl-10"
-                      value={eventName}
-                      onInput={(e) =>
-                        setEventName((e.target as HTMLInputElement).value)
                       }
                     />
                   </div>

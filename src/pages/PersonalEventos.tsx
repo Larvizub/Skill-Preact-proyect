@@ -64,11 +64,10 @@ export function PersonalEventos() {
 
   const [loading, setLoading] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
-  const [filterType, setFilterType] = useState<
-    "dateRange" | "eventId" | "eventName"
-  >("dateRange");
+  const [filterType, setFilterType] = useState<"dateRange" | "eventId">(
+    "dateRange"
+  );
   const [eventId, setEventId] = useState("");
-  const [eventName, setEventName] = useState("");
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
     return now.toISOString().split("T")[0];
@@ -90,10 +89,6 @@ export function PersonalEventos() {
     // Validar que haya criterios de búsqueda
     if (filterType === "eventId" && !eventId.trim()) {
       alert("Por favor ingresa un ID de evento");
-      return;
-    }
-    if (filterType === "eventName" && !eventName.trim()) {
-      alert("Por favor ingresa un nombre de evento");
       return;
     }
     if (filterType === "dateRange" && (!startDate || !endDate)) {
@@ -126,18 +121,11 @@ export function PersonalEventos() {
       let foundEvents: Event[];
       if (filterType === "dateRange") {
         foundEvents = await apiService.getEvents(startDate, endDate);
-      } else if (filterType === "eventId") {
-        foundEvents = await apiService.getEvents(
-          undefined,
-          undefined,
-          eventId.trim()
-        );
       } else {
         foundEvents = await apiService.getEvents(
           undefined,
           undefined,
-          undefined,
-          eventName.trim()
+          eventId.trim()
         );
       }
 
@@ -192,7 +180,6 @@ export function PersonalEventos() {
 
   const clearFilters = () => {
     setEventId("");
-    setEventName("");
     // Resetear todos los filtros a true (todos habilitados)
     const resetFilters: Record<string, boolean> = {};
     STATUS_DEFINITIONS.forEach((def) => {
@@ -347,7 +334,7 @@ export function PersonalEventos() {
         <div>
           <h1 className="text-3xl font-bold">Personal de Eventos</h1>
           <p className="text-muted-foreground">
-            Consulta el personal asignado a eventos por mes, nombre o ID
+            Consulta el personal asignado a eventos por rango de fechas o ID
           </p>
         </div>
 
@@ -376,14 +363,6 @@ export function PersonalEventos() {
               >
                 <Search className="w-4 h-4 mr-2" />
                 Por ID
-              </Button>
-              <Button
-                variant={filterType === "eventName" ? "default" : "outline"}
-                onClick={() => setFilterType("eventName")}
-                size="sm"
-              >
-                <Search className="w-4 h-4 mr-2" />
-                Por Nombre
               </Button>
             </div>
           </div>
@@ -420,20 +399,6 @@ export function PersonalEventos() {
                   value={eventId}
                   onChange={(e) =>
                     setEventId((e.target as HTMLInputElement).value)
-                  }
-                />
-              </div>
-            )}
-
-            {filterType === "eventName" && (
-              <div>
-                <Label htmlFor="eventName">Nombre del Evento</Label>
-                <Input
-                  id="eventName"
-                  placeholder="Ingresa el nombre del evento"
-                  value={eventName}
-                  onChange={(e) =>
-                    setEventName((e.target as HTMLInputElement).value)
                   }
                 />
               </div>
