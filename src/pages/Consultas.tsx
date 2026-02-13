@@ -25,6 +25,7 @@ import {
   Check,
   AlertCircle,
   CheckCircle2,
+  FileSpreadsheet,
 } from "lucide-preact";
 import {
   getEventStatusText,
@@ -36,6 +37,8 @@ import {
   DEFAULT_STATUS_FILTERS,
 } from "../lib/eventStatus";
 import { calculateItemAmounts } from "../lib/quoteUtils";
+import { generateConsultasExcelReport } from "../lib/reportUtils";
+import { Spinner } from "../components/ui/spinner";
 
 interface ConsultaItem {
   serviceName: string;
@@ -83,6 +86,7 @@ export function Consultas() {
   };
 
   const [loading, setLoading] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [loadingServices, setLoadingServices] = useState(true);
   const [filterType, setFilterType] = useState<
     "dateRange" | "eventId" | "eventName"
@@ -367,6 +371,49 @@ export function Consultas() {
     setEvents([]);
     setSelectedEvent(null);
     setConsultaData([]);
+  };
+
+  const handleExportExcel = async () => {
+    if (!selectedCategoryId) {
+      showTopNotice("Por favor selecciona una categoría para exportar.", "warning");
+      return;
+    }
+
+    if (events.length === 0) {
+      showTopNotice(
+        "No hay eventos para exportar. Realiza una búsqueda primero.",
+        "warning"
+      );
+      return;
+    }
+
+    const category = categories.find(
+      (item) => item.id === Number(selectedCategoryId)
+    );
+    const subCategory = subCategories.find(
+      (item) => item.id === Number(selectedSubCategoryId)
+    );
+
+    setGeneratingReport(true);
+    try {
+      await generateConsultasExcelReport(events, {
+        categoryId: Number(selectedCategoryId),
+        subCategoryId: selectedSubCategoryId
+          ? Number(selectedSubCategoryId)
+          : null,
+        categoryName: category?.name,
+        subCategoryName: subCategory?.name,
+      });
+      showTopNotice("Reporte Excel generado correctamente.", "success");
+    } catch (error: any) {
+      console.error("Error al generar reporte de consultas:", error);
+      showTopNotice(
+        error?.message || "Hubo un error al generar el reporte de Excel.",
+        "error"
+      );
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   const toggleStatusFilter = (id: StatusCategory) => {
@@ -676,12 +723,34 @@ export function Consultas() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={handleSearch} disabled={loading} className="flex-1">
+              <Button
+                onClick={handleSearch}
+                disabled={loading || generatingReport}
+                className="flex-1 min-w-[140px]"
+              >
                 <Search className="w-4 h-4 mr-2" />
                 {loading ? "Buscando..." : "Buscar"}
               </Button>
 
-              <Button onClick={clearFilters} variant="outline" className="flex-1">
+              <Button
+                onClick={handleExportExcel}
+                className="flex-1 min-w-[140px] bg-green-600 hover:bg-green-700 text-white border-none shadow-sm"
+                disabled={loading || generatingReport || events.length === 0}
+              >
+                {generatingReport ? (
+                  <Spinner className="h-4 w-4 mr-2" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                )}
+                {generatingReport ? "Generando..." : "Reporte Excel"}
+              </Button>
+
+              <Button
+                onClick={clearFilters}
+                variant="outline"
+                className="flex-1 min-w-[140px]"
+                disabled={loading || generatingReport}
+              >
                 <X className="w-4 h-4 mr-2" />
                 Limpiar
               </Button>

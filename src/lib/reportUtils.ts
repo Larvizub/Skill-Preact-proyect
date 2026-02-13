@@ -351,3 +351,159 @@ export async function generateParqueosExcelReport(events: any[]) {
     `Reporte_Parqueos_${new Date().toISOString().split("T")[0]}.xlsx`
   );
 }
+
+export async function generateConsultasExcelReport(
+  events: any[],
+  options: {
+    categoryId: number;
+    subCategoryId?: number | null;
+    categoryName?: string;
+    subCategoryName?: string;
+  }
+) {
+  const reportData: any[] = [];
+
+  const targetCategoryId = Number(options.categoryId || 0);
+  const targetSubCategoryId = Number(options.subCategoryId || 0);
+  const hasSubCategoryFilter = targetSubCategoryId > 0;
+
+  if (!targetCategoryId) {
+    throw new Error("Selecciona una categoría válida para exportar.");
+  }
+
+  const catalogServices = await apiService.getServices();
+  const serviceLookup = new Map<
+    number,
+    {
+      categoryId: number;
+      categoryName: string;
+      subCategoryId: number;
+      subCategoryName: string;
+    }
+  >();
+
+  catalogServices.forEach((service: any) => {
+    serviceLookup.set(Number(service.idService), {
+      categoryId: Number(service?.serviceCategory?.idServiceCategory || 0),
+      categoryName: service?.serviceCategory?.serviceCategoryName || "Sin categoría",
+      subCategoryId: Number(
+        service?.serviceSubCategory?.idServiceSubCategory || 0
+      ),
+      subCategoryName:
+        service?.serviceSubCategory?.serviceSubCategoryName || "Sin subcategoría",
+    });
+  });
+
+  const activeEvents = events.filter((event) => !isItemCancelled(event));
+  const BATCH_SIZE = 5;
+
+  for (let i = 0; i < activeEvents.length; i += BATCH_SIZE) {
+    const batch = activeEvents.slice(i, i + BATCH_SIZE);
+
+    await Promise.all(
+      batch.map(async (event) => {
+        let quote = null;
+        try {
+          const id = event.idEvent || event.eventId || event.eventNumber;
+          if (id) {
+            quote = await apiService.getEventQuote(String(id));
+          }
+        } catch (error) {
+          console.warn(
+            `No se pudo obtener la cotización para el evento ${event.idEvent}:`,
+            error
+          );
+        }
+
+        const activities = quote?.activities || event.activities || [];
+        if (!Array.isArray(activities)) return;
+
+        activities.forEach((activity: any) => {
+          if (isItemCancelled(activity) || !Array.isArray(activity.services)) {
+            return;
+          }
+
+          const activityTitle = activity.activityTitle || "Sin título";
+
+          activity.services.forEach((service: any) => {
+            if (isItemCancelled(service)) return;
+
+            const serviceId = Number(service.idService || service.service?.idService);
+            const lookup = serviceLookup.get(serviceId);
+
+            const categoryId = Number(
+              service?.serviceCategory?.idServiceCategory ||
+                lookup?.categoryId ||
+                0
+            );
+            const subCategoryId = Number(
+              service?.serviceSubCategory?.idServiceSubCategory ||
+                lookup?.subCategoryId ||
+                0
+            );
+
+            if (categoryId !== targetCategoryId) return;
+            if (hasSubCategoryFilter && subCategoryId !== targetSubCategoryId) {
+              return;
+            }
+
+            const quantity = Number(service.quantity || service.serviceQuantity || 0);
+            const { net, discount } = calculateItemAmounts(service, quantity);
+            const unitPrice = Number(service.priceTNI || 0);
+
+            reportData.push({
+              "ID del Evento": event.idEvent || event.eventNumber || "",
+              "Nombre del Evento": event.title || "",
+              Categoría:
+                service?.serviceCategory?.serviceCategoryName ||
+                lookup?.categoryName ||
+                options.categoryName ||
+                "Sin categoría",
+              Subcategoría:
+                service?.serviceSubCategory?.serviceSubCategoryName ||
+                lookup?.subCategoryName ||
+                (hasSubCategoryFilter
+                  ? options.subCategoryName || "Sin subcategoría"
+                  : "Todas"),
+              Servicio: service.serviceName || "Sin nombre",
+              Actividad: activityTitle,
+              Cantidad: quantity,
+              "Precio Unitario TNI": unitPrice,
+              Descuento: discount,
+              "Total Cotización TNI": net,
+              TOTAL: net - discount,
+            });
+          });
+        });
+      })
+    );
+  }
+
+  if (reportData.length === 0) {
+    throw new Error(
+      hasSubCategoryFilter
+        ? "No se encontraron servicios para la categoría y subcategoría seleccionadas."
+        : "No se encontraron servicios para la categoría seleccionada."
+    );
+  }
+
+  const worksheet = XLSX.utils.json_to_sheet(reportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Consultas");
+
+  const safeCategory = (options.categoryName || "Categoria")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .slice(0, 30);
+  const safeSubCategory = hasSubCategoryFilter
+    ? (options.subCategoryName || "SubCategoria")
+        .replace(/[^a-zA-Z0-9_-]+/g, "_")
+        .slice(0, 30)
+    : "Todas";
+
+  XLSX.writeFile(
+    workbook,
+    `Reporte_Consultas_${safeCategory}_${safeSubCategory}_${
+      new Date().toISOString().split("T")[0]
+    }.xlsx`
+  );
+}
