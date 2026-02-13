@@ -13,8 +13,6 @@ import { Inventario } from "./pages/Inventario.tsx";
 import { Clientes } from "./pages/Clientes.tsx";
 import { Contactos } from "./pages/Contactos.tsx";
 import { Coordinadores } from "./pages/Coordinadores.tsx";
-import { PersonalEventos } from "./pages/PersonalEventos.tsx";
-import { ParqueosEventos } from "./pages/ParqueosEventos.tsx";
 import { Consultas } from "./pages/Consultas.tsx";
 import { CRM } from "./pages/CRM.tsx";
 import { ApiTest } from "./pages/ApiTest.tsx";
@@ -55,10 +53,6 @@ function App() {
         <Coordinadores path="/coordinadores" />
         {/* @ts-ignore - preact-router path prop types */}
         <CRM path="/crm" />
-        {/* @ts-ignore - preact-router path prop types */}
-        <PersonalEventos path="/personal-eventos" />
-        {/* @ts-ignore - preact-router path prop types */}
-        <ParqueosEventos path="/parqueos-eventos" />
         {/* @ts-ignore - preact-router path prop types */}
         <Consultas path="/consultas" />
       </Router>

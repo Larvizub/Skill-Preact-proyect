@@ -551,9 +551,9 @@ export function Consultas() {
       <div className="space-y-6">
 
         <div>
-          <h1 className="text-3xl font-bold">Consultas</h1>
+          <h1 className="text-3xl font-bold">Consulta Servicios</h1>
           <p className="text-muted-foreground">
-            Consulta servicios por categoría y subcategoría en los eventos
+            Consulta servicios por categoría y subcategoría para tus eventos
           </p>
         </div>
 

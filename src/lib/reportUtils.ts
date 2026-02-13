@@ -202,7 +202,7 @@ export async function generatePersonalExcelReport(events: any[]) {
                 );
 
                 if (isPersonal) {
-                  // Normalizar el nombre del servicio para agrupar (igual que en PersonalEventos.tsx)
+                  // Normalizar el nombre del servicio para agrupar
                   let normalizedName = service.serviceName || "Sin nombre";
                   if (
                     serviceName.includes("auxiliar de limpieza") ||
