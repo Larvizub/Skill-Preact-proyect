@@ -14,6 +14,7 @@ import {
   CalendarCheck,
   UsersRound,
   Car,
+  Search,
   LogOut,
   BriefcaseBusiness,
 } from "lucide-preact";
@@ -32,6 +33,7 @@ const menuItems = [
   { path: "/crm", label: "CRM", icon: BriefcaseBusiness },
   { path: "/eventos", label: "Eventos", icon: ClipboardList },
   { path: "/calendario", label: "Calendario", icon: Calendar },
+  { path: "/consultas", label: "Consultas", icon: Search },
   { path: "/salones", label: "Salones", icon: Building },
   {
     path: "/salones-disponibles",
