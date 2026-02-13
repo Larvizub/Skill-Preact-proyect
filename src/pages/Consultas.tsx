@@ -23,6 +23,8 @@ import {
   Eye,
   ArrowLeft,
   Check,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-preact";
 import {
   getEventStatusText,
@@ -66,6 +68,13 @@ interface ServiceLookup {
   subCategoryName: string;
 }
 
+type TopNoticeType = "error" | "warning" | "success" | "info";
+
+interface TopNoticeState {
+  message: string;
+  type: TopNoticeType;
+}
+
 export function Consultas() {
   const getStatusColor = (event: Event) => {
     const statusCategory = classifyEventStatus(event);
@@ -105,6 +114,20 @@ export function Consultas() {
   const [statusFilters, setStatusFilters] = useState<
     Record<StatusCategory, boolean>
   >(DEFAULT_STATUS_FILTERS);
+  const [topNotice, setTopNotice] = useState<TopNoticeState | null>(null);
+
+  const showTopNotice = (
+    message: string,
+    type: TopNoticeType = "error",
+    durationMs = 4000
+  ) => {
+    setTopNotice({ message, type });
+    window.setTimeout(() => {
+      setTopNotice((current) =>
+        current?.message === message && current?.type === type ? null : current
+      );
+    }, durationMs);
+  };
 
   useEffect(() => {
     loadServiceCatalog();
@@ -160,7 +183,7 @@ export function Consultas() {
       setServiceLookup(lookup);
     } catch (error) {
       console.error("Error cargando catálogo de servicios:", error);
-      alert(
+      showTopNotice(
         "No se pudo cargar el catálogo de servicios. Intenta nuevamente para usar el módulo de consultas."
       );
     } finally {
@@ -174,25 +197,28 @@ export function Consultas() {
 
   const handleSearch = async () => {
     if (loadingServices) {
-      alert("Aún se está cargando el catálogo de servicios, intenta nuevamente.");
+      showTopNotice(
+        "Aún se está cargando el catálogo de servicios, intenta nuevamente.",
+        "warning"
+      );
       return;
     }
 
     if (!selectedCategoryId) {
-      alert("Por favor selecciona una categoría.");
+      showTopNotice("Por favor selecciona una categoría.", "warning");
       return;
     }
 
     if (filterType === "eventId" && !eventId.trim()) {
-      alert("Por favor ingresa un ID de evento");
+      showTopNotice("Por favor ingresa un ID de evento", "warning");
       return;
     }
     if (filterType === "eventName" && !eventName.trim()) {
-      alert("Por favor ingresa un nombre de evento");
+      showTopNotice("Por favor ingresa un nombre de evento", "warning");
       return;
     }
     if (filterType === "dateRange" && (!startDate || !endDate)) {
-      alert("Por favor selecciona un rango de fechas");
+      showTopNotice("Por favor selecciona un rango de fechas", "warning");
       return;
     }
 
@@ -204,8 +230,9 @@ export function Consultas() {
         (end.getMonth() - start.getMonth());
 
       if (diffMonths > 6) {
-        alert(
-          "Por favor selecciona un rango de fechas menor a 6 meses para optimizar la búsqueda"
+        showTopNotice(
+          "Por favor selecciona un rango de fechas menor a 6 meses para optimizar la búsqueda",
+          "warning"
         );
         return;
       }
@@ -236,7 +263,10 @@ export function Consultas() {
       }
 
       if (foundEvents.length === 0) {
-        alert("No se encontraron eventos con los criterios de búsqueda.");
+        showTopNotice(
+          "No se encontraron eventos con los criterios de búsqueda.",
+          "info"
+        );
         return;
       }
 
@@ -252,8 +282,9 @@ export function Consultas() {
       }
 
       if (foundEvents.length === 0) {
-        alert(
-          "No se encontraron eventos con los filtros de estatus seleccionados."
+        showTopNotice(
+          "No se encontraron eventos con los filtros de estatus seleccionados.",
+          "info"
         );
         return;
       }
@@ -263,8 +294,9 @@ export function Consultas() {
       );
 
       if (eventsWithMatchingServices.length === 0) {
-        alert(
-          "No se encontraron eventos con servicios para la categoría y subcategoría seleccionadas."
+        showTopNotice(
+          "No se encontraron eventos con servicios para los filtros de categoría y subcategoría seleccionados.",
+          "info"
         );
         return;
       }
@@ -272,7 +304,10 @@ export function Consultas() {
       setEvents(eventsWithMatchingServices);
     } catch (error) {
       console.error("Error al buscar eventos:", error);
-      alert("Error al buscar eventos. Por favor, intenta nuevamente.");
+      showTopNotice(
+        "Error al buscar eventos. Por favor, intenta nuevamente.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -451,7 +486,36 @@ export function Consultas() {
 
   return (
     <Layout>
+      {topNotice && (
+        <div className="fixed top-4 left-1/2 z-50 w-[92vw] max-w-2xl -translate-x-1/2 pointer-events-none">
+          <div className="pointer-events-auto">
+            <div
+              className={`flex items-center gap-3 rounded-md border px-4 py-3 shadow-lg backdrop-blur-sm ${
+                topNotice.type === "success"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                  : topNotice.type === "error"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : "border-destructive/40 bg-destructive/10 text-destructive"
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              {topNotice.type === "success" && (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              {(topNotice.type === "error" ||
+                topNotice.type === "warning" ||
+                topNotice.type === "info") && (
+                <AlertCircle className="h-4 w-4" />
+              )}
+              <p className="text-sm font-medium">{topNotice.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
+
         <div>
           <h1 className="text-3xl font-bold">Consultas</h1>
           <p className="text-muted-foreground">
