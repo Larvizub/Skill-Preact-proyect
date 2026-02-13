@@ -2269,25 +2269,25 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 Información General
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Descripción (full width) */}
+            <CardContent className="space-y-5">
               {(event as any)?.description && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                <div className="rounded-md border border-border/70 bg-muted/30 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Descripción
                   </p>
-                  <p className="text-sm mt-1">{(event as any).description}</p>
+                  <p className="text-sm mt-2 leading-relaxed">
+                    {(event as any).description}
+                  </p>
                 </div>
               )}
 
-              {/* Row 1: Fechas y Estatus */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Fecha Inicio
                   </p>
-                  <div className="flex items-center gap-2 text-sm mt-1">
-                    <Calendar className="h-4 w-4" />
+                  <div className="flex items-center gap-2 text-sm mt-2 font-medium">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     {formatDateLocal(event.startDate, "es-ES", {
                       year: "numeric",
                       month: "long",
@@ -2296,12 +2296,12 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Fecha Fin
                   </p>
-                  <div className="flex items-center gap-2 text-sm mt-1">
-                    <Calendar className="h-4 w-4" />
+                  <div className="flex items-center gap-2 text-sm mt-2 font-medium">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     {formatDateLocal(event.endDate, "es-ES", {
                       year: "numeric",
                       month: "long",
@@ -2310,205 +2310,173 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
+                <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Estatus
                   </p>
-                  <div className="text-sm mt-1">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventStatusColor(event)} text-white`}>
+                  <div className="mt-2">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventStatusColor(
+                        event
+                      )} text-white`}
+                    >
                       {statusLabel}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="h-px w-full bg-border/70" />
-
-              {/* Row 2: Segmento / Subsegmento / Tamaño */}
-              {(fallbackSegmentName || fallbackSubsegmentName || eventSizeName) && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-md border border-border/70 p-4 space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Clasificación del Evento
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Segmento de Mercado
                     </p>
-                    <p className="text-sm mt-1">{fallbackSegmentName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{fallbackSegmentName || "-"}</p>
                   </div>
-
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Subsegmento
                     </p>
-                    <p className="text-sm mt-1">
+                    <p className="text-sm mt-1 font-medium">
                       {fallbackSubsegmentName || "-"}
                     </p>
                   </div>
-
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Tamano del Evento
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Tamaño del Evento
                     </p>
-                    <p className="text-sm mt-1">{eventSizeName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{eventSizeName || "-"}</p>
                   </div>
-                </div>
-              )}
-
-              <div className="h-px w-full bg-border/70" />
-
-              {/* Row 3: Tipo / Subtipo / Caracter / Sector */}
-              {(fallbackEventTypeName || fallbackEventSubtypeName || eventCharacterName || eventSectorName) && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Tipo de Evento
                     </p>
-                    <p className="text-sm mt-1">{fallbackEventTypeName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{fallbackEventTypeName || "-"}</p>
                   </div>
-
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Subtipo
                     </p>
-                    <p className="text-sm mt-1">{fallbackEventSubtypeName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{fallbackEventSubtypeName || "-"}</p>
                   </div>
-
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Caracter
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Carácter
                     </p>
-                    <p className="text-sm mt-1">{eventCharacterName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{eventCharacterName || "-"}</p>
                   </div>
-
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Sector
                     </p>
-                    <p className="text-sm mt-1">{eventSectorName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{eventSectorName || "-"}</p>
                   </div>
-                </div>
-              )}
-
-              <div className="h-px w-full bg-border/70" />
-
-              {/* Row 4: PAX / Stands */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    PAX Estimado
-                  </p>
-                  <div className="flex items-center gap-2 text-sm mt-1">
-                    <Users className="h-4 w-4" />
-                    {(event as any)?.estimatedPax || "No especificado"}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    PAX Real
-                  </p>
-                  <div className="flex items-center gap-2 text-sm mt-1">
-                    <Users className="h-4 w-4" />
-                    {(event as any)?.realPax || "No especificado"}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Cantidad de Stands
-                  </p>
-                  <p className="text-sm mt-1">
-                    {hasStandsQuantity ? String(standsQuantity) : "-"}
-                  </p>
-                </div>
-
-              </div>
-
-              <div className="h-px w-full bg-border/70" />
-
-              {/* Row 5: Contrato / Referencia / Descuento / Vencimiento */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Contrato
-                  </p>
-                  <p className="text-sm mt-1">
-                    {(event as any)?.contractNumber || "-"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Referencia
-                  </p>
-                  <p className="text-sm mt-1">
-                    {(event as any)?.reference || "-"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Descuento (%)
-                  </p>
-                  <p className="text-sm mt-1">
-                    {hasDiscountPercentage ? String(discountPercentage) : "-"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Vencimiento de Cotizacion
-                  </p>
-                  <p className="text-sm mt-1">
-                    {quoteExpirationDate
-                      ? formatDateLocal(quoteExpirationDate)
-                      : "-"}
-                  </p>
                 </div>
               </div>
 
-              <div className="h-px w-full bg-border/70" />
-
-              {/* Row 6: Forma de pago / Impuestos / Imprevisto / Propina */}
-              {(fallbackPaymentFormName || taxExemptionName || contingencyName || extraTipName) && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-md border border-border/70 p-4 space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Operación y Condiciones Comerciales
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      PAX Estimado
+                    </p>
+                    <div className="flex items-center gap-2 text-sm mt-1 font-medium">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      {(event as any)?.estimatedPax || "No especificado"}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      PAX Real
+                    </p>
+                    <div className="flex items-center gap-2 text-sm mt-1 font-medium">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      {(event as any)?.realPax || "No especificado"}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Cantidad de Stands
+                    </p>
+                    <p className="text-sm mt-1 font-medium">
+                      {hasStandsQuantity ? String(standsQuantity) : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Contrato
+                    </p>
+                    <p className="text-sm mt-1 font-medium">
+                      {(event as any)?.contractNumber || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Referencia
+                    </p>
+                    <p className="text-sm mt-1 font-medium">
+                      {(event as any)?.reference || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Descuento (%)
+                    </p>
+                    <p className="text-sm mt-1 font-medium">
+                      {hasDiscountPercentage ? String(discountPercentage) : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Vencimiento de Cotización
+                    </p>
+                    <p className="text-sm mt-1 font-medium">
+                      {quoteExpirationDate ? formatDateLocal(quoteExpirationDate) : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
                       Forma de Pago
                     </p>
-                    <p className="text-sm mt-1">{fallbackPaymentFormName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{fallbackPaymentFormName || "-"}</p>
                   </div>
-
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Impuestos
                     </p>
-                    <p className="text-sm mt-1">{taxExemptionName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{taxExemptionName || "-"}</p>
                   </div>
-
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Imprevisto
                     </p>
-                    <p className="text-sm mt-1">{contingencyName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{contingencyName || "-"}</p>
                   </div>
-
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Propina
                     </p>
-                    <p className="text-sm mt-1">{extraTipName || "-"}</p>
+                    <p className="text-sm mt-1 font-medium">{extraTipName || "-"}</p>
                   </div>
                 </div>
-              )}
+              </div>
 
-              <div className="h-px w-full bg-border/70" />
-
-              {/* Row 7: ICCA / Sostenible / Repetitivo */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Evento ICCA
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
+              <div className="rounded-md border border-border/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  Indicadores
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      Evento ICCA
+                    </p>
                     {isICCA ? (
                       <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium">
                         <ShieldCheck className="h-4 w-4" />
@@ -2518,13 +2486,11 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                       <span className="text-sm text-muted-foreground italic">No</span>
                     )}
                   </div>
-                </div>
 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Sostenible
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      Sostenible
+                    </p>
                     {isSostenible ? (
                       <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
                         <Leaf className="h-4 w-4" />
@@ -2534,13 +2500,11 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                       <span className="text-sm text-muted-foreground italic">No</span>
                     )}
                   </div>
-                </div>
 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Evento Repetitivo
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      Evento Repetitivo
+                    </p>
                     {hasRepetitiveEvent ? (
                       rawEvent?.repetitiveEvent ? (
                         <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
@@ -2571,22 +2535,21 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   Cliente
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Código y Nombre del Cliente */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+              <CardContent className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Código Cliente
                     </p>
-                    <p className="text-sm mt-1">
+                    <p className="text-sm mt-2 font-medium">
                       {(event as any).client?.clientCode || "-"}
                     </p>
                   </div>
-                  <div className="md:col-span-2">
-                    <p className="text-sm font-medium text-muted-foreground">
+                  <div className="rounded-md border border-border/70 bg-muted/20 p-3 md:col-span-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Cliente
                     </p>
-                    <p className="text-sm mt-1">
+                    <p className="text-sm mt-2 font-medium">
                       {(event as any).client?.clientName || "No especificado"}
                     </p>
                   </div>
@@ -2594,28 +2557,24 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
 
                 {/* Event Manager (si existe) */}
                 {(event as any).clientEventManager && (
-                  <div
-                    className={`${
-                      (event as any).client?.clientCode ? "pt-4 border-t" : ""
-                    }`}
-                  >
-                    <h4 className="text-sm font-semibold mb-3">
+                  <div className="rounded-md border border-border/70 p-4 space-y-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Event Manager
-                    </h4>
+                    </p>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-xs font-medium text-muted-foreground">
                           Nombre
                         </p>
-                        <p className="text-sm mt-1">
+                        <p className="text-sm mt-1 font-medium">
                           {(event as any).clientEventManager
                             .clientEventManagerName || "-"}
                         </p>
                       </div>
 
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-xs font-medium text-muted-foreground">
                           Contacto
                         </p>
                         <div className="space-y-1 mt-1 text-sm">
@@ -2666,7 +2625,7 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                       </div>
 
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-xs font-medium text-muted-foreground">
                           Ubicación
                         </p>
                         <div className="text-sm mt-1 space-y-1">
@@ -2696,33 +2655,33 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     </div>
 
                     {/* Extra fields */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {(event as any).clientEventManager.JobTitle && (
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">
+                          <p className="text-xs font-medium text-muted-foreground">
                             Cargo
                           </p>
-                          <p className="text-sm mt-1">
+                          <p className="text-sm mt-1 font-medium">
                             {(event as any).clientEventManager.JobTitle}
                           </p>
                         </div>
                       )}
                       {(event as any).clientEventManager.Department && (
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">
+                          <p className="text-xs font-medium text-muted-foreground">
                             Departamento
                           </p>
-                          <p className="text-sm mt-1">
+                          <p className="text-sm mt-1 font-medium">
                             {(event as any).clientEventManager.Department}
                           </p>
                         </div>
                       )}
                       {(event as any).clientEventManager.Mobile && (
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">
+                          <p className="text-xs font-medium text-muted-foreground">
                             Móvil
                           </p>
-                          <p className="text-sm mt-1">
+                          <p className="text-sm mt-1 font-medium">
                             {(event as any).clientEventManager.Mobile}
                           </p>
                         </div>
@@ -2730,11 +2689,11 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     </div>
 
                     {(event as any).clientEventManager.Notes && (
-                      <div className="pt-3">
-                        <p className="text-sm font-medium text-muted-foreground">
+                      <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                        <p className="text-xs font-medium text-muted-foreground">
                           Notas
                         </p>
-                        <p className="text-sm mt-1 whitespace-pre-wrap">
+                        <p className="text-sm mt-2 whitespace-pre-wrap leading-relaxed">
                           {(event as any).clientEventManager.Notes}
                         </p>
                       </div>
@@ -2754,22 +2713,23 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                   Coordinador de Cuenta
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <CardContent>
+                <div className="rounded-md border border-border/70 p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Nombre
                     </p>
-                    <p className="text-sm mt-1">
+                    <p className="text-sm mt-2 font-medium">
                       {(event as any).salesAgent.salesAgentName ||
                         "No especificado"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Email
                     </p>
-                    <div className="text-sm mt-1">
+                    <div className="text-sm mt-2">
                       {(event as any).salesAgent.salesAgentEmail ? (
                         <a
                           href={`mailto:${
@@ -2787,13 +2747,14 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Teléfono
                     </p>
-                    <p className="text-sm mt-1">
+                    <p className="text-sm mt-2 font-medium">
                       {(event as any).salesAgent.salesAgentPhone || "-"}
                     </p>
                   </div>
+                </div>
                 </div>
               </CardContent>
             </Card>
@@ -2809,9 +2770,14 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm">
-                  {(event as any).eventType.eventTypeName || "No especificado"}
-                </p>
+                <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Tipo Principal
+                  </p>
+                  <p className="text-sm mt-2 font-medium">
+                    {(event as any).eventType.eventTypeName || "No especificado"}
+                  </p>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -3317,21 +3283,21 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
               </CardHeader>
               <CardContent className="space-y-3">
                 {(event as any)?.comments && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                  <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Comentarios Generales
                     </p>
-                    <p className="text-sm mt-1 whitespace-pre-wrap">
+                    <p className="text-sm mt-2 whitespace-pre-wrap leading-relaxed">
                       {(event as any).comments}
                     </p>
                   </div>
                 )}
                 {(event as any)?.internalComments && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                  <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Comentarios Internos
                     </p>
-                    <p className="text-sm mt-1 whitespace-pre-wrap">
+                    <p className="text-sm mt-2 whitespace-pre-wrap leading-relaxed">
                       {(event as any).internalComments}
                     </p>
                   </div>
@@ -3383,7 +3349,6 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                     if (isItemCancelled(activity)) return;
                     if (activity.rooms && Array.isArray(activity.rooms)) {
                       activity.rooms.forEach((room: any) => {
-                        if (isItemCancelled(room)) return;
                         const { net, discount, tax, price } =
                           calculateItemAmounts(room, 1);
 
@@ -3885,43 +3850,42 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 Información del Sistema
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              {/* Column 1: Fecha Creación + Fecha Límite */}
-              <div>
-                {(event as any)?.creationDate && (
-                  <>
-                    <p className="font-medium text-muted-foreground">
-                      Fecha Creación
-                    </p>
-                    <p className="mt-1">
-                      {new Date((event as any).creationDate).toLocaleString(
-                        "es-ES"
-                      )}
-                    </p>
-                  </>
-                )}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                  {(event as any)?.creationDate && (
+                    <>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Fecha Creación
+                      </p>
+                      <p className="mt-2 text-sm font-medium">
+                        {new Date((event as any).creationDate).toLocaleString(
+                          "es-ES"
+                        )}
+                      </p>
+                    </>
+                  )}
 
-                {deadlineDate && (
-                  <div className="mt-3">
-                    <p className="font-medium text-muted-foreground">
-                      Fecha Límite
-                    </p>
-                    <p className="mt-1">
-                      {deadlineDate.toLocaleString("es-ES", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                )}
-              </div>
+                  {deadlineDate && (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Fecha Límite
+                      </p>
+                      <p className="mt-2 text-sm font-medium">
+                        {deadlineDate.toLocaleString("es-ES", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
-              {/* Column 2: Contador (centrado) */}
-              <div className="flex items-center justify-center">
+                <div className="rounded-md border border-border/70 bg-muted/20 p-3 flex items-center justify-center">
                 {countdownActive && timeLeftMs !== null ? (
                   (() => {
                     const ms = timeLeftMs;
@@ -3992,29 +3956,31 @@ export function EventoDetalle({ eventNumber, id }: EventoDetalleProps) {
                 ) : (
                   <div className="text-sm text-muted-foreground">No aplica</div>
                 )}
-              </div>
+                </div>
 
-              {/* Column 3: Última Modificación + Estado textual */}
-              <div className="text-right">
-                {(event as any)?.modificationDate && (
-                  <>
-                    <p className="font-medium text-muted-foreground">
-                      Última Modificación
-                    </p>
-                    <p className="mt-1">
-                      {new Date((event as any).modificationDate).toLocaleString(
-                        "es-ES"
-                      )}
-                    </p>
-                  </>
-                )}
+                <div className="rounded-md border border-border/70 bg-muted/20 p-3">
+                  {(event as any)?.modificationDate && (
+                    <>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Última Modificación
+                      </p>
+                      <p className="mt-2 text-sm font-medium">
+                        {new Date((event as any).modificationDate).toLocaleString(
+                          "es-ES"
+                        )}
+                      </p>
+                    </>
+                  )}
 
-                <div className="mt-3">
-                  <p className="font-medium text-muted-foreground">Estado</p>
-                  <div className="mt-1">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventStatusColor(event)} text-white`}>
-                      {statusLabel}
-                    </span>
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Estado
+                    </p>
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventStatusColor(event)} text-white`}>
+                        {statusLabel}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
