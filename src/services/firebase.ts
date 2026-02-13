@@ -68,9 +68,4 @@ export function getFirebaseDatabaseByKey(key: FirebaseDatabaseKey) {
   return instance;
 }
 
-function resetFirebase() {
-  realtimeDbCache.clear();
-  app = null;
-}
-
 export default app;
