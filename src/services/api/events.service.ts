@@ -125,7 +125,7 @@ export function createEventsService({
       const eventForUpdate: Record<string, unknown> = {
         ...(resolvedIdEvent ? { idEvent: resolvedIdEvent } : {}),
         title: required.title,
-        description: cleanOptional((eventPayload as any)?.description),
+        description: cleanNonNullString((eventPayload as any)?.description),
         startDate: required.startDate,
         endDate: required.endDate,
         idClient: required.idClient,
