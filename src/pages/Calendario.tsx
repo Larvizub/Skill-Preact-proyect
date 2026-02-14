@@ -11,7 +11,7 @@ import { Button } from "../components/ui/button";
 import { DatePicker } from "../components/ui/datepicker";
 import { Spinner } from "../components/ui/spinner";
 import { apiService } from "../services/api.service";
-import type { Event } from "../services/api.service";
+import type { Event, Room } from "../services/api.service";
 import {
   ChevronLeft,
   ChevronRight,
@@ -51,13 +51,32 @@ import { parseDateLocal } from "../lib/dateUtils";
 
 // Límite de eventos visibles por día antes de mostrar contador
 const MAX_VISIBLE_EVENTS = 3;
+const GANTT_DAY_WIDTH = 44;
+const GANTT_ROOM_COL_WIDTH = 220;
+
+type CalendarView = "month" | "rooms";
+
+interface RoomLane {
+  key: string;
+  label: string;
+  sortOrder: number;
+}
+
+interface LaneSegment {
+  event: Event;
+  startIndex: number;
+  endIndex: number;
+  track: number;
+}
 
 export function Calendario() {
   const [currentDate, setCurrentDate] = useState(new Date());
   // monthPickerValue eliminado: usamos el DatePicker directamente para navegar
   const [events, setEvents] = useState<Event[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [calendarView, setCalendarView] = useState<CalendarView>("month");
   const [statusFilters, setStatusFilters] = useState<
     Record<StatusCategory, boolean>
   >(() => ({ ...DEFAULT_STATUS_FILTERS }));
@@ -115,15 +134,27 @@ export function Calendario() {
     try {
       const start = format(startOfMonth(currentDate), "yyyy-MM-dd");
       const end = format(endOfMonth(currentDate), "yyyy-MM-dd");
-      const data = await apiService.getEvents(start, end);
+      const [eventsData, roomsData] = await Promise.all([
+        apiService.getEvents(start, end),
+        apiService.getRooms().catch(() => []),
+      ]);
 
       // Log para debugging - ver estructura de eventos
-      if (data.length > 0) {
-        console.log("Primer evento recibido:", data[0]);
-        console.log("EventStatus del primer evento:", data[0].eventStatus);
+      if (eventsData.length > 0) {
+        console.log("Primer evento recibido:", eventsData[0]);
+        console.log("EventStatus del primer evento:", eventsData[0].eventStatus);
       }
 
-      setEvents(data);
+      setEvents(eventsData);
+      const activeRooms = (roomsData as Room[])
+        .filter((room) => room.roomActive)
+        .sort((a, b) => {
+          const orderA = Number(a.roomVisualOrder ?? 0);
+          const orderB = Number(b.roomVisualOrder ?? 0);
+          if (orderA !== orderB) return orderA - orderB;
+          return (a.roomName || "").localeCompare(b.roomName || "", "es");
+        });
+      setRooms(activeRooms);
     } catch (error) {
       console.error("Error loading events:", error);
     } finally {
@@ -276,6 +307,257 @@ export function Calendario() {
     [events, statusFilters, segmentFilters]
   );
 
+  const monthStartDay = startOfDay(monthStart);
+  const monthEndDay = startOfDay(monthEnd);
+
+  const roomLanes = useMemo(() => {
+    const normalizedNameToKey = new Map<string, string>();
+    const laneByKey = new Map<string, RoomLane>();
+
+    rooms.forEach((room, index) => {
+      const key = `id:${room.idRoom}`;
+      const label = room.roomName || room.roomCode || `Salón ${room.idRoom}`;
+      laneByKey.set(key, {
+        key,
+        label,
+        sortOrder: Number(room.roomVisualOrder ?? index),
+      });
+
+      const normalizedName = label
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0000-\u036f]/g, "")
+        .toLowerCase();
+      if (normalizedName) {
+        normalizedNameToKey.set(normalizedName, key);
+      }
+    });
+
+    const extractLaneKeys = (event: Event): string[] => {
+      const keys = new Set<string>();
+      const roomNames = new Set<string>();
+      const visited = new WeakSet<object>();
+
+      const keySuggestsRoom = (key?: string) => {
+        if (!key) return false;
+        const normalized = key
+          .trim()
+          .normalize("NFD")
+          .replace(/[\u0000-\u036f]/g, "")
+          .toLowerCase();
+
+        return (
+          normalized.includes("room") ||
+          normalized.includes("salon") ||
+          normalized.includes("space")
+        );
+      };
+
+      const tryPushId = (value: any) => {
+        const id = Number(value);
+        if (Number.isNaN(id) || id <= 0) return;
+        keys.add(`id:${id}`);
+      };
+
+      const tryPushName = (value: any) => {
+        if (!value) return;
+        const text = String(value);
+        const tokens = [text, ...text.split(/[;,/|]+/g)];
+
+        tokens.forEach((token) => {
+          const normalized = token
+            .trim()
+            .normalize("NFD")
+            .replace(/[\u0000-\u036f]/g, "")
+            .toLowerCase();
+          if (!normalized) return;
+
+          const existingLaneKey = normalizedNameToKey.get(normalized);
+          if (existingLaneKey) {
+            keys.add(existingLaneKey);
+            return;
+          }
+
+          roomNames.add(token.trim());
+        });
+      };
+
+      const scan = (value: any, keyHint?: string) => {
+        if (value == null) return;
+
+        if (Array.isArray(value)) {
+          value.forEach((item) => scan(item, keyHint));
+          return;
+        }
+
+        if (typeof value === "number") {
+          if (keySuggestsRoom(keyHint)) {
+            tryPushId(value);
+          }
+          return;
+        }
+
+        if (typeof value === "string") {
+          if (keySuggestsRoom(keyHint)) {
+            const match = value.match(/\d+/);
+            if (match) {
+              tryPushId(match[0]);
+            }
+            tryPushName(value);
+          }
+          return;
+        }
+
+        if (typeof value !== "object") return;
+        if (visited.has(value)) return;
+        visited.add(value);
+
+        tryPushId((value as any).idRoom);
+        tryPushId((value as any).roomId);
+        tryPushId((value as any).idSalon);
+        tryPushId((value as any).salonId);
+        tryPushId((value as any).idSpace);
+        tryPushId((value as any).spaceId);
+
+        tryPushName((value as any).roomName);
+        tryPushName((value as any).salonName);
+        tryPushName((value as any).spaceName);
+        tryPushName((value as any).roomCode);
+        tryPushName((value as any).salon);
+
+        Object.entries(value).forEach(([key, nested]) => {
+          scan(nested, key);
+        });
+      };
+
+      scan(event);
+
+      if (keys.size === 0 && roomNames.size > 0) {
+        roomNames.forEach((roomName) => {
+          const laneKey = `name:${roomName}`;
+          if (!laneByKey.has(laneKey)) {
+            laneByKey.set(laneKey, {
+              key: laneKey,
+              label: roomName,
+              sortOrder: Number.MAX_SAFE_INTEGER - 2,
+            });
+          }
+          keys.add(laneKey);
+        });
+      }
+
+      if (keys.size === 0) {
+        const fallbackKey = "unassigned";
+        if (!laneByKey.has(fallbackKey)) {
+          laneByKey.set(fallbackKey, {
+            key: fallbackKey,
+            label: "Sin salón asignado",
+            sortOrder: Number.MAX_SAFE_INTEGER,
+          });
+        }
+        keys.add(fallbackKey);
+      }
+
+      return Array.from(keys);
+    };
+
+    const lanesUsed = new Set<string>();
+
+    filteredEvents.forEach((event) => {
+      const eventStart = startOfDay(
+        parseDateLocal(event.startDate) || new Date(event.startDate)
+      );
+      const eventEnd = startOfDay(
+        parseDateLocal(event.endDate) || new Date(event.endDate)
+      );
+
+      if (isAfter(eventStart, monthEndDay) || isBefore(eventEnd, monthStartDay)) {
+        return;
+      }
+
+      const eventLaneKeys = extractLaneKeys(event);
+      eventLaneKeys.forEach((laneKey) => lanesUsed.add(laneKey));
+    });
+
+    const lanes = Array.from(laneByKey.values())
+      .filter((lane) => lanesUsed.has(lane.key))
+      .sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) {
+          return a.sortOrder - b.sortOrder;
+        }
+        return a.label.localeCompare(b.label, "es");
+      });
+
+    return { lanes, extractLaneKeys };
+  }, [filteredEvents, rooms, monthStartDay, monthEndDay]);
+
+  const laneSegmentsByKey = useMemo(() => {
+    const map = new Map<string, LaneSegment[]>();
+
+    roomLanes.lanes.forEach((lane) => {
+      map.set(lane.key, []);
+    });
+
+    filteredEvents.forEach((event) => {
+      const eventStart = startOfDay(parseDateLocal(event.startDate) || new Date());
+      const eventEnd = startOfDay(parseDateLocal(event.endDate) || new Date());
+
+      if (isAfter(eventStart, monthEndDay) || isBefore(eventEnd, monthStartDay)) {
+        return;
+      }
+
+      const visibleStart = isBefore(eventStart, monthStartDay)
+        ? monthStartDay
+        : eventStart;
+      const visibleEnd = isAfter(eventEnd, monthEndDay) ? monthEndDay : eventEnd;
+
+      const startIndex = Math.max(0, differenceInDays(visibleStart, monthStartDay));
+      const endIndex = Math.min(
+        days.length - 1,
+        differenceInDays(visibleEnd, monthStartDay)
+      );
+
+      const laneKeys = roomLanes.extractLaneKeys(event);
+
+      laneKeys.forEach((laneKey) => {
+        if (!map.has(laneKey)) {
+          map.set(laneKey, []);
+        }
+        map.get(laneKey)!.push({ event, startIndex, endIndex, track: 0 });
+      });
+    });
+
+    map.forEach((segments, laneKey) => {
+      const sorted = [...segments].sort((a, b) => {
+        if (a.startIndex !== b.startIndex) {
+          return a.startIndex - b.startIndex;
+        }
+        return a.endIndex - b.endIndex;
+      });
+
+      const trackEndByIndex: number[] = [];
+      const packed: LaneSegment[] = sorted.map((segment) => {
+        let track = 0;
+        while (
+          track < trackEndByIndex.length &&
+          trackEndByIndex[track] >= segment.startIndex
+        ) {
+          track += 1;
+        }
+        trackEndByIndex[track] = segment.endIndex;
+
+        return {
+          ...segment,
+          track,
+        };
+      });
+
+      map.set(laneKey, packed);
+    });
+
+    return map;
+  }, [days.length, filteredEvents, roomLanes, monthStartDay, monthEndDay]);
+
   const getEventsSpanningDate = (date: Date) => {
     return filteredEvents.filter((event) => {
       const eventStart = startOfDay(
@@ -397,6 +679,27 @@ export function Calendario() {
                   }}
                 />
               </div>
+
+              <div className="inline-flex items-center rounded-md border p-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={calendarView === "month" ? "default" : "ghost"}
+                  className="h-8"
+                  onClick={() => setCalendarView("month")}
+                >
+                  Mes
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={calendarView === "rooms" ? "default" : "ghost"}
+                  className="h-8"
+                  onClick={() => setCalendarView("rooms")}
+                >
+                  Salones
+                </Button>
+              </div>
             </div>
 
             <div className="mt-4 text-xs">
@@ -449,6 +752,140 @@ export function Calendario() {
               <div className="text-center py-8">
                 <Spinner size="md" />
               </div>
+            ) : calendarView === "rooms" ? (
+              roomLanes.lanes.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No hay eventos con salón asignado para este mes.
+                </div>
+              ) : (
+                <div className="overflow-auto rounded-md border">
+                  <div
+                    className="min-w-max"
+                    style={{
+                      width:
+                        GANTT_ROOM_COL_WIDTH + days.length * GANTT_DAY_WIDTH,
+                    }}
+                  >
+                    <div
+                      className="sticky top-0 z-30 border-b bg-background"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: `${GANTT_ROOM_COL_WIDTH}px repeat(${days.length}, ${GANTT_DAY_WIDTH}px)`,
+                      }}
+                    >
+                      <div className="sticky left-0 z-40 border-r bg-background px-3 py-2 text-sm font-medium">
+                        Salón
+                      </div>
+                      {days.map((day) => (
+                        <div
+                          key={`header-${day.toISOString()}`}
+                          className="border-r px-1 py-2 text-center"
+                        >
+                          <div className="text-sm font-medium">
+                            {format(day, "d")}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {format(day, "EEE", { locale: es })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {roomLanes.lanes.map((lane) => {
+                      const segments = laneSegmentsByKey.get(lane.key) || [];
+                      const totalTracks =
+                        segments.length > 0
+                          ? Math.max(...segments.map((segment) => segment.track)) +
+                            1
+                          : 1;
+                      const laneHeight = Math.max(52, totalTracks * 24 + 8);
+
+                      return (
+                        <div
+                          key={lane.key}
+                          className="border-b"
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: `${GANTT_ROOM_COL_WIDTH}px 1fr`,
+                          }}
+                        >
+                          <div className="sticky left-0 z-20 border-r bg-background px-3 py-2 text-sm font-medium">
+                            {lane.label}
+                          </div>
+
+                          <div
+                            className="relative"
+                            style={{
+                              height: laneHeight,
+                              width: days.length * GANTT_DAY_WIDTH,
+                            }}
+                          >
+                            {days.map((day) => (
+                              <div
+                                key={`${lane.key}-grid-${day.toISOString()}`}
+                                className="absolute top-0 h-full border-r"
+                                style={{
+                                  left:
+                                    differenceInDays(day, monthStartDay) *
+                                    GANTT_DAY_WIDTH,
+                                  width: GANTT_DAY_WIDTH,
+                                }}
+                              />
+                            ))}
+
+                            {segments.map((segment) => {
+                              const colorClass = getEventStatusColor(
+                                segment.event
+                              );
+                              const statusCategory = classifyEventStatus(
+                                segment.event
+                              );
+                              const textColorClass =
+                                statusCategory === "confirmado"
+                                  ? "text-gray-900"
+                                  : "text-white";
+                              const left = segment.startIndex * GANTT_DAY_WIDTH + 2;
+                              const width =
+                                (segment.endIndex - segment.startIndex + 1) *
+                                  GANTT_DAY_WIDTH -
+                                4;
+
+                              return (
+                                <button
+                                  key={`${lane.key}-${segment.event.idEvent}-${segment.startIndex}-${segment.track}`}
+                                  type="button"
+                                  className={`${colorClass} ${textColorClass} absolute flex h-5 items-center rounded px-2 text-[10px] font-medium shadow-sm transition-transform hover:-translate-y-0.5`}
+                                  style={{
+                                    left,
+                                    top: 4 + segment.track * 22,
+                                    width,
+                                  }}
+                                  onClick={() => handleEventClick(segment.event)}
+                                  title={`${segment.event.title} (${format(
+                                    parseDateLocal(segment.event.startDate) ||
+                                      new Date(),
+                                    "d MMM",
+                                    { locale: es }
+                                  )} - ${format(
+                                    parseDateLocal(segment.event.endDate) ||
+                                      new Date(),
+                                    "d MMM",
+                                    { locale: es }
+                                  )})`}
+                                >
+                                  <span className="truncate">
+                                    {segment.event.title}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )
             ) : (
               <div className="space-y-4">
                 {/* Day Headers */}
