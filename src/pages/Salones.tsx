@@ -38,6 +38,10 @@ import { toast } from "sonner";
 export function Salones() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomRates, setRoomRates] = useState<RoomRate[]>([]);
+  const [loadingRates, setLoadingRates] = useState(false);
+  const [ratesStatus, setRatesStatus] = useState<
+    "idle" | "loading" | "ready" | "empty" | "error"
+  >("idle");
   const [loading, setLoading] = useState(true);
   const [exportingGeneral, setExportingGeneral] = useState(false);
   const [exportingTotals, setExportingTotals] = useState(false);
@@ -50,16 +54,34 @@ export function Salones() {
 
   const loadData = async () => {
     try {
-      const [roomsData, roomRatesData] = await Promise.all([
-        apiService.getRooms(),
-        apiService.getRoomRates().catch(() => [] as RoomRate[]),
-      ]);
+      const roomsData = await apiService.getRooms();
       setRooms(roomsData);
+
+      setLoading(false);
+      setLoadingRates(true);
+      setRatesStatus("loading");
+
+      const roomIds = roomsData
+        .map((room: Room) => Number(room.idRoom))
+        .filter((id: number) => Number.isFinite(id) && id > 0);
+
+      const roomRatesData = await apiService
+        .getRoomRates(roomIds)
+        .catch(() => [] as RoomRate[]);
+
       setRoomRates(Array.isArray(roomRatesData) ? roomRatesData : []);
+
+      if (!Array.isArray(roomRatesData) || roomRatesData.length === 0) {
+        setRatesStatus("empty");
+      } else {
+        setRatesStatus("ready");
+      }
     } catch (error) {
       console.error("Error loading rooms:", error);
-    } finally {
       setLoading(false);
+      setRatesStatus("error");
+    } finally {
+      setLoadingRates(false);
     }
   };
 
@@ -73,6 +95,11 @@ export function Salones() {
       maximumFractionDigits: 2,
     }).format(value);
   };
+
+  const roomsWithResolvedPriceCount = rooms.filter((room) => {
+    const priceInfo = getRoomPriceInfo(room, roomRates);
+    return priceInfo.price !== null && Number.isFinite(priceInfo.price);
+  }).length;
 
   const handleExportGeneral = async () => {
     if (rooms.length === 0 || exportingGeneral) return;
@@ -153,7 +180,31 @@ export function Salones() {
                 <CardTitle>Lista de Salones</CardTitle>
                 <CardDescription>
                   {rooms.length} salones disponibles
+                  {loadingRates ? " • Cargando tarifas..." : ""}
                 </CardDescription>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {ratesStatus === "loading" && (
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner className="h-3 w-3" />
+                      Consultando precios de salones...
+                    </span>
+                  )}
+                  {ratesStatus === "ready" && (
+                    <span>
+                      Precios cargados para {roomsWithResolvedPriceCount} de {rooms.length} salones.
+                    </span>
+                  )}
+                  {ratesStatus === "empty" && (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      No se encontraron tarifas para la consulta actual.
+                    </span>
+                  )}
+                  {ratesStatus === "error" && (
+                    <span className="text-red-600 dark:text-red-400">
+                      Error consultando tarifas de salones.
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
@@ -249,9 +300,15 @@ export function Salones() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {formatCurrency(
-                            roomPriceInfo.price,
-                            roomPriceInfo.currency
+                          {loadingRates ? (
+                            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                              <Spinner className="h-3 w-3" />
+                              Cargando...
+                            </span>
+                          ) : roomPriceInfo.price !== null ? (
+                            formatCurrency(roomPriceInfo.price, roomPriceInfo.currency)
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Sin tarifa</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">

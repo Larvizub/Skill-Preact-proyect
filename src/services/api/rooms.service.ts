@@ -64,14 +64,43 @@ export function createRoomsService({
       return [];
     });
 
-  const getRoomRates = () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const payload = buildPayload({
-      roomRates: {
-        idEventActivity: 0,
-        priceDate: today,
-      },
-    });
+  const getRoomRates = (roomIds: number[] = []) => {
+    const toISODate = (date: Date) => date.toISOString().slice(0, 10);
+    const now = new Date();
+    const today = toISODate(now);
+
+    const normalizedRoomIds = roomIds
+      .map((value) => Number(value))
+      .filter((value, index, list) => Number.isFinite(value) && value > 0 && list.indexOf(value) === index);
+
+    const buildRoomRatesPayload = (
+      priceDate: string,
+      idEventActivity: number,
+      includeExtendedFields = false
+    ) => {
+      const baseRoomRates: Record<string, unknown> = {
+        idEventActivity,
+        priceDate,
+      };
+
+      if (normalizedRoomIds.length > 0) {
+        baseRoomRates.roomList = normalizedRoomIds;
+      }
+
+      if (includeExtendedFields) {
+        baseRoomRates.idRoom = normalizedRoomIds[0] ?? 0;
+        baseRoomRates.idRoomSetup = 0;
+        baseRoomRates.roomList =
+          normalizedRoomIds.length > 0 ? normalizedRoomIds : [];
+        baseRoomRates.roomTypeList = [];
+        baseRoomRates.roomSetupList = [];
+        baseRoomRates.locationList = [];
+      }
+
+      return buildPayload({ roomRates: baseRoomRates });
+    };
+
+    const payloadDefault = buildPayload();
 
     const parseRates = (result: any): RoomRate[] => {
       if (Array.isArray(result)) return result;
@@ -84,35 +113,168 @@ export function createRoomsService({
       return [] as RoomRate[];
     };
 
+    const fetchRatesAttempt = async (
+      endpoint: "/events/getroomrates" | "/GetRoomRates",
+      body: string
+    ) => {
+      const response = await apiRequest<
+        RoomRate[]
+        | { roomRates?: RoomRate[] }
+        | { result?: { roomRates?: RoomRate[] } }
+      >(endpoint, {
+        method: "POST",
+        body,
+      });
+
+      return parseRates(response);
+    };
+
+    const tryCommonQueries = async (idEventActivity: number) => {
+      const dateCandidates = [
+        today,
+        `${now.getFullYear()}-01-01`,
+        `${now.getFullYear()}-12-31`,
+      ];
+
+      for (const dateCandidate of dateCandidates) {
+        const payloadCandidates = [
+          buildRoomRatesPayload(dateCandidate, idEventActivity, false),
+          buildRoomRatesPayload(dateCandidate, idEventActivity, true),
+          buildPayload({
+            idEventActivity,
+            priceDate: dateCandidate,
+            ...(normalizedRoomIds.length > 0
+              ? { roomList: normalizedRoomIds }
+              : {}),
+          }),
+        ];
+
+        for (const payloadCandidate of payloadCandidates) {
+          for (const endpoint of [
+            "/events/getroomrates",
+            "/GetRoomRates",
+          ] as const) {
+            try {
+              const rates = await fetchRatesAttempt(endpoint, payloadCandidate);
+              if (rates.length > 0) return rates;
+            } catch {
+              // noop
+            }
+          }
+
+        }
+      }
+
+      return [] as RoomRate[];
+    };
+
+    const extractEventActivityIdsDeep = (
+      source: unknown,
+      output: Set<number>,
+      depth = 0
+    ) => {
+      if (!source || depth > 6) return;
+
+      if (Array.isArray(source)) {
+        source.forEach((item) =>
+          extractEventActivityIdsDeep(item, output, depth + 1)
+        );
+        return;
+      }
+
+      if (typeof source !== "object") return;
+
+      const node = source as Record<string, unknown>;
+      const maybeId = Number(
+        node.idEventActivity ?? node.eventActivityId ?? node.idActivity
+      );
+      if (Number.isFinite(maybeId) && maybeId > 0) {
+        output.add(maybeId);
+      }
+
+      Object.values(node).forEach((value) => {
+        if (value && (typeof value === "object" || Array.isArray(value))) {
+          extractEventActivityIdsDeep(value, output, depth + 1);
+        }
+      });
+    };
+
+    const resolveCandidateEventActivityIds = async () => {
+      const candidateIds = new Set<number>();
+
+      try {
+        const currentYear = now.getFullYear();
+        const startDate = `${currentYear}-01-01`;
+        const endDate = `${currentYear}-12-31`;
+
+        const events = await getEvents(startDate, endDate);
+        extractEventActivityIdsDeep(events, candidateIds);
+
+        if (candidateIds.size > 0) {
+          return Array.from(candidateIds).slice(0, 12);
+        }
+
+        const candidateEventNumbers = Array.from(
+          new Set(
+            events
+              .map((event) => Number((event as any)?.eventNumber))
+              .filter((value) => Number.isFinite(value) && value > 0)
+          )
+        ).slice(0, 5);
+
+        for (const eventNumber of candidateEventNumbers) {
+          try {
+            const schedules = await getSchedules(
+              undefined,
+              undefined,
+              eventNumber
+            );
+
+            const eventActivityId = schedules
+              .map((schedule: any) =>
+                Number(
+                  schedule?.idEventActivity ??
+                    schedule?.eventActivity?.idEventActivity ??
+                    schedule?.activity?.idEventActivity ??
+                    schedule?.idActivity
+                )
+              )
+              .find((value) => Number.isFinite(value) && value > 0);
+
+            if (eventActivityId) candidateIds.add(eventActivityId);
+          } catch {
+            // noop
+          }
+        }
+      } catch {
+        // noop
+      }
+
+      return Array.from(candidateIds).slice(0, 12);
+    };
+
     return withFallback(
       async () => {
-        const primary = await apiRequest<
-          RoomRate[]
-          | { roomRates?: RoomRate[] }
-          | { result?: { roomRates?: RoomRate[] } }
-        >("/events/getroomrates", {
-          method: "POST",
-          body: payload,
-        });
+        const commonRates = await tryCommonQueries(0);
+        if (commonRates.length > 0) return commonRates;
 
-        const primaryRates = parseRates(primary);
-        if (primaryRates.length > 0) return primaryRates;
+        const candidateEventActivityIds = await resolveCandidateEventActivityIds();
+        for (const candidateEventActivityId of candidateEventActivityIds) {
+          const ratesByActivity = await tryCommonQueries(candidateEventActivityId);
+          if (ratesByActivity.length > 0) return ratesByActivity;
+        }
 
         try {
-          const legacy = await apiRequest<
-            RoomRate[]
-            | { roomRates?: RoomRate[] }
-            | { result?: { roomRates?: RoomRate[] } }
-          >("/GetRoomRates", {
-            method: "POST",
-            body: payload,
-          });
-
-          const legacyRates = parseRates(legacy);
-          return legacyRates.length > 0 ? legacyRates : primaryRates;
+          const defaultRates = await fetchRatesAttempt(
+            "/GetRoomRates",
+            payloadDefault
+          );
+          if (defaultRates.length > 0) return defaultRates;
         } catch {
-          return primaryRates;
+          // noop
         }
+
+        return [] as RoomRate[];
       },
       () =>
         apiRequest<
@@ -121,7 +283,7 @@ export function createRoomsService({
           | { result?: { roomRates?: RoomRate[] } }
         >("/GetRoomRates", {
           method: "POST",
-          body: payload,
+          body: buildRoomRatesPayload(today, 0, true),
         })
     ).then((result) => parseRates(result));
   };

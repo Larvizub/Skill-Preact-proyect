@@ -131,6 +131,12 @@ const candidateBuilders: Record<string, CandidateBuilder> = {
       roomRates: {
         idEventActivity: 0,
         priceDate: new Date().toISOString().slice(0, 10),
+        idRoom: 0,
+        idRoomSetup: 0,
+        roomList: [],
+        roomTypeList: [],
+        roomSetupList: [],
+        locationList: [],
       },
       ...(baseBody ?? {}),
       ...authPayload,

@@ -85,6 +85,56 @@ const pickActivePriceList = (rate: any) => {
   return lists[0] ?? null;
 };
 
+const extractFromRatesArrayTNI = (roomRateNode: any) => {
+  if (!Array.isArray(roomRateNode?.rates)) return null;
+
+  const expanded = roomRateNode.rates
+    .map((rateItem: any) => {
+      const selectedPriceList = pickActivePriceList(rateItem);
+      const tni =
+        asPositiveNumber(selectedPriceList?.roomPriceTaxesNotIncluded) ??
+        asPositiveNumber(rateItem?.roomPriceTaxesNotIncluded) ??
+        asPositiveNumber(rateItem?.priceTNI);
+
+      if (tni === null) return null;
+
+      const currencyCode =
+        String(
+          rateItem?.currency?.currencyCode ??
+            selectedPriceList?.currencyCode ??
+            rateItem?.currencyCode ??
+            DEFAULT_CURRENCY
+        ) || DEFAULT_CURRENCY;
+
+      const nestedRoomId =
+        asNumber(rateItem?.idRoom) ??
+        asNumber(rateItem?.roomId) ??
+        asNumber(rateItem?.room?.idRoom) ??
+        asNumber(rateItem?.roomSetup?.room?.idRoom) ??
+        null;
+
+      const nestedSetupId =
+        asNumber(rateItem?.idRoomSetup) ??
+        asNumber(rateItem?.roomSetupId) ??
+        asNumber(rateItem?.roomSetup?.idRoomSetup) ??
+        null;
+
+      return { tni, currencyCode, nestedRoomId, nestedSetupId };
+    })
+    .filter(Boolean) as Array<{
+      tni: number;
+      currencyCode: string;
+      nestedRoomId: number | null;
+      nestedSetupId: number | null;
+    }>;
+
+  if (expanded.length === 0) return null;
+
+  return expanded.reduce((min, current) =>
+    current.tni < min.tni ? current : min
+  );
+};
+
 const extractPriceTNI = (rate: any) => {
   const selectedPriceList = pickActivePriceList(rate);
   const deepTni = findNumericDeep(
@@ -106,12 +156,18 @@ const extractPriceTNI = (rate: any) => {
 };
 
 const normalizeRate = (rate: RoomRate): NormalizedRoomRate => {
+  const fromRatesArray = extractFromRatesArrayTNI(rate as any);
+
   const roomId =
     asNumber((rate as any).roomId) ??
     asNumber((rate as any).idRoom) ??
     asNumber((rate as any).room?.idRoom) ??
     asNumber((rate as any).roomSetup?.room?.idRoom) ??
+    asNumber((rate as any).rates?.[0]?.idRoom) ??
+    asNumber((rate as any).rates?.[0]?.roomId) ??
+    asNumber((rate as any).rates?.[0]?.room?.idRoom) ??
     asNumber((rate as any).idActivityRoom) ??
+    fromRatesArray?.nestedRoomId ??
     null;
 
   const setupId =
@@ -119,6 +175,10 @@ const normalizeRate = (rate: RoomRate): NormalizedRoomRate => {
     asNumber((rate as any).roomSetupId) ??
     asNumber((rate as any).setupId) ??
     asNumber((rate as any).roomSetup?.idRoomSetup) ??
+    asNumber((rate as any).rates?.[0]?.idRoomSetup) ??
+    asNumber((rate as any).rates?.[0]?.roomSetupId) ??
+    asNumber((rate as any).rates?.[0]?.roomSetup?.idRoomSetup) ??
+    fromRatesArray?.nestedSetupId ??
     null;
 
   const setupName = String(
@@ -131,6 +191,7 @@ const normalizeRate = (rate: RoomRate): NormalizedRoomRate => {
     .toLowerCase();
 
   const price =
+    fromRatesArray?.tni ??
     extractPriceTNI(rate as any) ??
     asPositiveNumber((rate as any).rate) ??
     asPositiveNumber((rate as any).price) ??
@@ -141,6 +202,7 @@ const normalizeRate = (rate: RoomRate): NormalizedRoomRate => {
 
   const currency =
     String(
+      fromRatesArray?.currencyCode ??
       (rate as any).currency ??
         (rate as any).currencyCode ??
         (rate as any).priceList?.currencyCode ??
@@ -253,6 +315,18 @@ export const getRoomPriceInfo = (room: Room, roomRates: RoomRate[]) => {
     return {
       price: minSetupRate.price,
       currency: minSetupRate.currency || DEFAULT_CURRENCY,
+    };
+  }
+
+  const embeddedRoomPrice = findNumericDeep(
+    room as unknown,
+    /roomPriceTaxesNotIncluded|roomRateTaxesNotIncluded|priceTNI|withouttax|taxesnotincluded/i
+  );
+
+  if (embeddedRoomPrice !== null && Number.isFinite(embeddedRoomPrice)) {
+    return {
+      price: embeddedRoomPrice,
+      currency: DEFAULT_CURRENCY,
     };
   }
 
