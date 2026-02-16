@@ -85,22 +85,22 @@ const pickActivePriceList = (rate: any) => {
   return lists[0] ?? null;
 };
 
-const extractPriceTI = (rate: any) => {
+const extractPriceTNI = (rate: any) => {
   const selectedPriceList = pickActivePriceList(rate);
-  const deepTi = findNumericDeep(
+  const deepTni = findNumericDeep(
     rate,
-    /(priceTI|taxesincluded|withtax|inclu|incluido|roomPriceTI|roomRateTI)/i
+    /(priceTNI|taxesnotincluded|withouttax|notincluded|sinimpuesto|roomPriceTNI|roomRateTNI)/i
   );
 
   return (
-    deepTi ??
-    asPositiveNumber(rate?.priceTI) ??
-    asPositiveNumber(rate?.roomPriceTaxesIncluded) ??
-    asPositiveNumber(rate?.roomRateTaxesIncluded) ??
-    asPositiveNumber(rate?.roomSetupPriceTaxesIncluded) ??
-    asPositiveNumber(rate?.priceList?.roomPriceTaxesIncluded) ??
-    asPositiveNumber(selectedPriceList?.roomPriceTaxesIncluded) ??
-    asPositiveNumber(selectedPriceList?.roomRateTaxesIncluded) ??
+    deepTni ??
+    asPositiveNumber(rate?.priceTNI) ??
+    asPositiveNumber(rate?.roomPriceTaxesNotIncluded) ??
+    asPositiveNumber(rate?.roomRateTaxesNotIncluded) ??
+    asPositiveNumber(rate?.roomSetupPriceTaxesNotIncluded) ??
+    asPositiveNumber(rate?.priceList?.roomPriceTaxesNotIncluded) ??
+    asPositiveNumber(selectedPriceList?.roomPriceTaxesNotIncluded) ??
+    asPositiveNumber(selectedPriceList?.roomRateTaxesNotIncluded) ??
     null
   );
 };
@@ -131,7 +131,7 @@ const normalizeRate = (rate: RoomRate): NormalizedRoomRate => {
     .toLowerCase();
 
   const price =
-    extractPriceTI(rate as any) ??
+    extractPriceTNI(rate as any) ??
     asPositiveNumber((rate as any).rate) ??
     asPositiveNumber((rate as any).price) ??
     asPositiveNumber((rate as any).amount) ??
@@ -283,7 +283,7 @@ export async function generateRoomsGeneralExcelReport(
       "Altura (m)": room.roomHeight,
       "Capacidad Máxima": capacity,
       Estado: room.roomActive ? "Activo" : "Inactivo",
-      "Precio TI": priceInfo.price ?? "N/D",
+      "Precio TNI": priceInfo.price ?? "N/D",
       Moneda: priceInfo.currency,
       Comentarios: room.roomComments || "",
     };
@@ -341,7 +341,7 @@ export async function generateRoomsTotalsExcelReport(
       "Nombre Salón": room.roomName,
       Montajes: room.roomSetups.length,
       "Capacidad Máxima": maxCapacity,
-      "Precio TI Base": basePrice,
+      "Precio TNI Base": basePrice,
       "Total Montajes": totalSetups,
       "Total Salón": totalRoom,
       Moneda: baseRate?.currency || setupPrices[0]?.currency || DEFAULT_CURRENCY,
@@ -363,7 +363,7 @@ export async function generateRoomsTotalsExcelReport(
         "ID Montaje": setup.idRoomSetup,
         Montaje: setup.roomSetupName || "Sin nombre",
         "Capacidad Montaje": setup.roomSetupPaxsCapacity,
-        "Precio TI Montaje": rate?.price ?? "N/D",
+        "Precio TNI Montaje": rate?.price ?? "N/D",
         Moneda: rate?.currency || DEFAULT_CURRENCY,
       };
     })

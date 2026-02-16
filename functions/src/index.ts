@@ -123,6 +123,24 @@ const candidateBuilders: Record<string, CandidateBuilder> = {
       { path: "/GetServices", method: "POST", body: fallbackBody },
     ];
   },
+  "/events/getroomrates": ({ headers, body, method }) => {
+    const authPayload = extractAuthPayload(headers, body);
+    const baseBody =
+      typeof body === "object" && body !== null ? body : undefined;
+    const fallbackBody = {
+      roomRates: {
+        idEventActivity: 0,
+        priceDate: new Date().toISOString().slice(0, 10),
+      },
+      ...(baseBody ?? {}),
+      ...authPayload,
+    };
+
+    return [
+      { path: "/events/getroomrates", method, body: baseBody },
+      { path: "/GetRoomRates", method: "POST", body: fallbackBody },
+    ];
+  },
   "/events": ({ headers, body, method }) => {
     const authPayload = extractAuthPayload(headers, body);
     const baseBody =

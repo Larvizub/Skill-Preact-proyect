@@ -84,11 +84,32 @@ export interface RoomRate {
   idRoomSetup?: number;
   roomSetupId?: number;
   roomSetupName?: string;
+  priceTNI?: number;
+  priceTI?: number;
+  roomPriceTaxesNotIncluded?: number;
+  roomPriceTaxesIncluded?: number;
+  roomRateTaxesNotIncluded?: number;
+  roomRateTaxesIncluded?: number;
   rate?: number;
   price?: number;
   amount?: number;
   currency?: string;
   currencyCode?: string;
+  priceList?: {
+    roomPriceTaxesNotIncluded?: number;
+    roomPriceTaxesIncluded?: number;
+    currencyCode?: string;
+    currency?: string;
+  };
+  priceLists?: Array<{
+    roomPriceTaxesNotIncluded?: number;
+    roomPriceTaxesIncluded?: number;
+    currencyCode?: string;
+    currency?: string;
+    priceListActive?: boolean;
+    priceListFromDate?: string;
+    priceListToDate?: string;
+  }>;
 }
 
 export interface ServiceRate {

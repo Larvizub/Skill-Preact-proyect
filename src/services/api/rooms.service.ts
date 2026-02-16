@@ -73,16 +73,47 @@ export function createRoomsService({
       },
     });
 
+    const parseRates = (result: any): RoomRate[] => {
+      if (Array.isArray(result)) return result;
+      if (Array.isArray((result as any)?.roomRates)) {
+        return (result as any).roomRates;
+      }
+      if (Array.isArray((result as any)?.result?.roomRates)) {
+        return (result as any).result.roomRates;
+      }
+      return [] as RoomRate[];
+    };
+
     return withFallback(
-      () =>
-        apiRequest<
+      async () => {
+        const primary = await apiRequest<
           RoomRate[]
           | { roomRates?: RoomRate[] }
           | { result?: { roomRates?: RoomRate[] } }
         >("/events/getroomrates", {
           method: "POST",
           body: payload,
-        }),
+        });
+
+        const primaryRates = parseRates(primary);
+        if (primaryRates.length > 0) return primaryRates;
+
+        try {
+          const legacy = await apiRequest<
+            RoomRate[]
+            | { roomRates?: RoomRate[] }
+            | { result?: { roomRates?: RoomRate[] } }
+          >("/GetRoomRates", {
+            method: "POST",
+            body: payload,
+          });
+
+          const legacyRates = parseRates(legacy);
+          return legacyRates.length > 0 ? legacyRates : primaryRates;
+        } catch {
+          return primaryRates;
+        }
+      },
       () =>
         apiRequest<
           RoomRate[]
@@ -92,16 +123,7 @@ export function createRoomsService({
           method: "POST",
           body: payload,
         })
-    ).then((result) => {
-      if (Array.isArray(result)) return result;
-      if (Array.isArray((result as any)?.roomRates)) {
-        return (result as any).roomRates;
-      }
-      if (Array.isArray((result as any)?.result?.roomRates)) {
-        return (result as any).result.roomRates;
-      }
-      return [] as RoomRate[];
-    });
+    ).then((result) => parseRates(result));
   };
 
   const getRoomsAvailability = (startDate: string, endDate: string) =>

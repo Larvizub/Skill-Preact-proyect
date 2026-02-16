@@ -198,7 +198,7 @@ export function Salones() {
                       <TableHead>Altura</TableHead>
                       <TableHead>Capacidad</TableHead>
                       <TableHead>Estado</TableHead>
-                      <TableHead>Precio TI</TableHead>
+                      <TableHead>Precio TNI</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
