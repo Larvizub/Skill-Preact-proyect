@@ -380,6 +380,10 @@ export async function generateRoomsTotalsExcelReport(
   const summaryRows = rooms.map((room) => {
     const baseRate = findBaseRate(Number(room.idRoom), normalizedRates);
 
+    const setupTypes = room.roomSetups
+      .map((setup) => (setup.roomSetupName || "").trim())
+      .filter((name, index, list) => name.length > 0 && list.indexOf(name) === index);
+
     const setupPrices = room.roomSetups.map((setup) => {
       const rate = findSetupRate(
         Number(room.idRoom),
@@ -414,6 +418,8 @@ export async function generateRoomsTotalsExcelReport(
       "ID Salón": room.idRoom,
       "Nombre Salón": room.roomName,
       Montajes: room.roomSetups.length,
+      "Tipos de Montaje":
+        setupTypes.length > 0 ? setupTypes.join(", ") : "Sin montajes",
       "Capacidad Máxima": maxCapacity,
       "Precio TNI Base": basePrice,
       "Total Montajes": totalSetups,
