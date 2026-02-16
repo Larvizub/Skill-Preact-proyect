@@ -16,11 +16,13 @@ import { Coordinadores } from "./pages/Coordinadores.tsx";
 import { Consultas } from "./pages/Consultas.tsx";
 import { CRM } from "./pages/CRM.tsx";
 import { ApiTest } from "./pages/ApiTest.tsx";
+import { Toaster } from "sonner";
 import "./app.css";
 
 function App() {
   return (
     <ThemeProvider>
+      <Toaster richColors position="top-right" />
       <Router>
         {/* @ts-ignore - preact-router path prop types */}
         <Login path="/" />

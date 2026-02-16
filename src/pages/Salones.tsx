@@ -26,12 +26,21 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { apiService } from "../services/api.service";
-import type { Room } from "../services/api.service";
-import { Building, Users, Eye, Check, X } from "lucide-preact";
+import type { Room, RoomRate } from "../services/api.service";
+import { Building, Users, Eye, Check, X, FileSpreadsheet } from "lucide-preact";
+import {
+  generateRoomsGeneralExcelReport,
+  generateRoomsTotalsExcelReport,
+  getRoomPriceInfo,
+} from "../lib/roomsReportUtils";
+import { toast } from "sonner";
 
 export function Salones() {
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomRates, setRoomRates] = useState<RoomRate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingGeneral, setExportingGeneral] = useState(false);
+  const [exportingTotals, setExportingTotals] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -41,12 +50,69 @@ export function Salones() {
 
   const loadData = async () => {
     try {
-      const roomsData = await apiService.getRooms();
+      const [roomsData, roomRatesData] = await Promise.all([
+        apiService.getRooms(),
+        apiService.getRoomRates().catch(() => [] as RoomRate[]),
+      ]);
       setRooms(roomsData);
+      setRoomRates(Array.isArray(roomRatesData) ? roomRatesData : []);
     } catch (error) {
       console.error("Error loading rooms:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const formatCurrency = (value: number | null, currency: string) => {
+    if (value === null || !Number.isFinite(value)) return "N/D";
+
+    return new Intl.NumberFormat("es-CR", {
+      style: "currency",
+      currency: currency || "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  const handleExportGeneral = async () => {
+    if (rooms.length === 0 || exportingGeneral) return;
+
+    const toastId = "salones-reporte-general";
+    setExportingGeneral(true);
+    toast.loading("Generando reporte general de salones...", { id: toastId });
+
+    try {
+      await generateRoomsGeneralExcelReport(rooms, roomRates);
+      toast.success("Reporte general generado correctamente.", { id: toastId });
+    } catch (error) {
+      console.error("Error exporting general rooms report:", error);
+      toast.error("No se pudo generar el reporte general de salones.", {
+        id: toastId,
+      });
+    } finally {
+      setExportingGeneral(false);
+    }
+  };
+
+  const handleExportTotals = async () => {
+    if (rooms.length === 0 || exportingTotals) return;
+
+    const toastId = "salones-reporte-totales";
+    setExportingTotals(true);
+    toast.loading("Generando reporte total de salones...", { id: toastId });
+
+    try {
+      await generateRoomsTotalsExcelReport(rooms, roomRates);
+      toast.success("Reporte total de salones generado correctamente.", {
+        id: toastId,
+      });
+    } catch (error) {
+      console.error("Error exporting rooms totals report:", error);
+      toast.error("No se pudo generar el reporte total de salones.", {
+        id: toastId,
+      });
+    } finally {
+      setExportingTotals(false);
     }
   };
 
@@ -82,10 +148,40 @@ export function Salones() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Lista de Salones</CardTitle>
-            <CardDescription>
-              {rooms.length} salones disponibles
-            </CardDescription>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle>Lista de Salones</CardTitle>
+                <CardDescription>
+                  {rooms.length} salones disponibles
+                </CardDescription>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  onClick={handleExportGeneral}
+                  disabled={rooms.length === 0 || exportingGeneral}
+                  className="bg-green-600 hover:bg-green-700 text-white border-none shadow-sm"
+                >
+                  {exportingGeneral ? (
+                    <Spinner className="h-4 w-4 mr-2" />
+                  ) : (
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  )}
+                  {exportingGeneral ? "Generando..." : "Reporte Excel General"}
+                </Button>
+                <Button
+                  onClick={handleExportTotals}
+                  disabled={rooms.length === 0 || exportingTotals}
+                  className="bg-green-600 hover:bg-green-700 text-white border-none shadow-sm"
+                >
+                  {exportingTotals ? (
+                    <Spinner className="h-4 w-4 mr-2" />
+                  ) : (
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  )}
+                  {exportingTotals ? "Generando..." : "Reporte Excel Totales"}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {rooms.length === 0 ? (
@@ -102,12 +198,16 @@ export function Salones() {
                       <TableHead>Altura</TableHead>
                       <TableHead>Capacidad</TableHead>
                       <TableHead>Estado</TableHead>
+                      <TableHead>Precio TI</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rooms.map((room) => (
-                      <TableRow key={room.idRoom}>
+                    {rooms.map((room) => {
+                      const roomPriceInfo = getRoomPriceInfo(room, roomRates);
+
+                      return (
+                        <TableRow key={room.idRoom}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Building className="h-4 w-4 text-muted-foreground" />
@@ -148,6 +248,12 @@ export function Salones() {
                             </span>
                           )}
                         </TableCell>
+                        <TableCell>
+                          {formatCurrency(
+                            roomPriceInfo.price,
+                            roomPriceInfo.currency
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button
                             size="sm"
@@ -158,8 +264,9 @@ export function Salones() {
                             Ver
                           </Button>
                         </TableCell>
-                      </TableRow>
-                    ))}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

@@ -18,6 +18,7 @@
     "lucide-preact": "^0.544.0",
     "preact": "^10.27.2",
     "preact-router": "^4.1.2",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "xlsx": "^0.18.5"
   },

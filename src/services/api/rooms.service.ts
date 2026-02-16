@@ -64,19 +64,45 @@ export function createRoomsService({
       return [];
     });
 
-  const getRoomRates = () =>
-    withFallback(
+  const getRoomRates = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const payload = buildPayload({
+      roomRates: {
+        idEventActivity: 0,
+        priceDate: today,
+      },
+    });
+
+    return withFallback(
       () =>
-        apiRequest<RoomRate[]>("/events/getroomrates", {
+        apiRequest<
+          RoomRate[]
+          | { roomRates?: RoomRate[] }
+          | { result?: { roomRates?: RoomRate[] } }
+        >("/events/getroomrates", {
           method: "POST",
-          body: buildPayload(),
+          body: payload,
         }),
       () =>
-        apiRequest<RoomRate[]>("/GetRoomRates", {
+        apiRequest<
+          RoomRate[]
+          | { roomRates?: RoomRate[] }
+          | { result?: { roomRates?: RoomRate[] } }
+        >("/GetRoomRates", {
           method: "POST",
-          body: buildPayload(),
+          body: payload,
         })
-    );
+    ).then((result) => {
+      if (Array.isArray(result)) return result;
+      if (Array.isArray((result as any)?.roomRates)) {
+        return (result as any).roomRates;
+      }
+      if (Array.isArray((result as any)?.result?.roomRates)) {
+        return (result as any).result.roomRates;
+      }
+      return [] as RoomRate[];
+    });
+  };
 
   const getRoomsAvailability = (startDate: string, endDate: string) =>
     apiRequest<RoomAvailability[]>("/events/getroomsavailability", {

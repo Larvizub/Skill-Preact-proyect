@@ -78,10 +78,17 @@ export interface Service {
 }
 
 export interface RoomRate {
-  id: string;
-  roomId: string;
-  rate: number;
-  currency: string;
+  id?: string | number;
+  roomId?: string | number;
+  idRoom?: number;
+  idRoomSetup?: number;
+  roomSetupId?: number;
+  roomSetupName?: string;
+  rate?: number;
+  price?: number;
+  amount?: number;
+  currency?: string;
+  currencyCode?: string;
 }
 
 export interface ServiceRate {
