@@ -377,14 +377,26 @@ export async function generateRoomsTotalsExcelReport(
   const normalizedRates = normalizeRoomRates(roomRates);
   const reportDate = new Date().toISOString().split("T")[0];
 
-  const summaryRows = rooms.map((room) => {
+  const summaryRows = rooms.flatMap((room) => {
     const baseRate = findBaseRate(Number(room.idRoom), normalizedRates);
+    const basePrice = baseRate?.price ?? 0;
 
-    const setupTypes = room.roomSetups
-      .map((setup) => (setup.roomSetupName || "").trim())
-      .filter((name, index, list) => name.length > 0 && list.indexOf(name) === index);
+    if (room.roomSetups.length === 0) {
+      return [
+        {
+          "ID Salón": room.idRoom,
+          "Nombre Salón": room.roomName,
+          "Tipo de Montaje": "Sin montajes",
+          "Cantidad Pax Tipo": 0,
+          "Precio TNI Base": basePrice,
+          "Precio TNI Montaje": 0,
+          "Total Fila": basePrice,
+          Moneda: baseRate?.currency || DEFAULT_CURRENCY,
+        },
+      ];
+    }
 
-    const setupPrices = room.roomSetups.map((setup) => {
+    return room.roomSetups.map((setup) => {
       const rate = findSetupRate(
         Number(room.idRoom),
         Number(setup.idRoomSetup),
@@ -392,40 +404,20 @@ export async function generateRoomsTotalsExcelReport(
         normalizedRates
       );
 
+      const setupPrice = rate?.price ?? 0;
+      const currency = rate?.currency || baseRate?.currency || DEFAULT_CURRENCY;
+
       return {
-        setupId: setup.idRoomSetup,
-        setupName: setup.roomSetupName || "Sin nombre",
-        setupCapacity: setup.roomSetupPaxsCapacity,
-        setupPrice: rate?.price ?? 0,
-        currency: rate?.currency || baseRate?.currency || DEFAULT_CURRENCY,
+        "ID Salón": room.idRoom,
+        "Nombre Salón": room.roomName,
+        "Tipo de Montaje": setup.roomSetupName || "Sin nombre",
+        "Cantidad Pax Tipo": setup.roomSetupPaxsCapacity,
+        "Precio TNI Base": basePrice,
+        "Precio TNI Montaje": setupPrice,
+        "Total Fila": basePrice + setupPrice,
+        Moneda: currency,
       };
     });
-
-    const totalSetups = setupPrices.reduce(
-      (sum, item) => sum + (Number.isFinite(item.setupPrice) ? item.setupPrice : 0),
-      0
-    );
-
-    const basePrice = baseRate?.price ?? 0;
-    const totalRoom = basePrice + totalSetups;
-
-    const maxCapacity =
-      room.roomSetups.length > 0
-        ? Math.max(...room.roomSetups.map((setup) => setup.roomSetupPaxsCapacity))
-        : null;
-
-    return {
-      "ID Salón": room.idRoom,
-      "Nombre Salón": room.roomName,
-      Montajes: room.roomSetups.length,
-      "Tipos de Montaje":
-        setupTypes.length > 0 ? setupTypes.join(", ") : "Sin montajes",
-      "Capacidad Máxima": maxCapacity,
-      "Precio TNI Base": basePrice,
-      "Total Montajes": totalSetups,
-      "Total Salón": totalRoom,
-      Moneda: baseRate?.currency || setupPrices[0]?.currency || DEFAULT_CURRENCY,
-    };
   });
 
   const setupRows = rooms.flatMap((room) =>
