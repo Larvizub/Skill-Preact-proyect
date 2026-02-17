@@ -41,11 +41,7 @@ import {
 import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 
-// Implementación limpia que sigue la especificación del usuario:
-// - obtener rooms y events(start,end)
-// - filtrar eventos que solapan el rango (inclusive)
-// - quedarnos sólo con eventos con estatus bloqueante: Confirmado, Por Confirmar, Reunión Interna
-// - extraer ids de salones ocupados (varias formas posibles) y restarlos del catálogo
+
 export function SalonesDisponibles() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
