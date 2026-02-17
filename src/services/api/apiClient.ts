@@ -1,7 +1,6 @@
 import { API_CONFIG, authService } from "../auth.service";
 import { route } from "preact-router";
 
-// Función genérica para hacer peticiones a la API
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -15,7 +14,6 @@ export async function apiRequest<T>(
     headers: {
       "Content-Type": "application/json",
       Authorization: token ? `Bearer ${token}` : "",
-      // Headers requeridos por Skill Suite API
       idData: authService.getIdData(),
       companyAuthId: API_CONFIG.companyAuthId,
       ...options.headers,
@@ -23,16 +21,11 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    // Si es 401, el token expiró - limpiar sesión y redirigir
     if (response.status === 401) {
-      // Token inválido/expirado: limpiar sesión y navegar usando el router SPA.
       authService.logout();
       try {
-        // Usar route de preact-router para evitar recarga completa de la página
-        // y asegurar que el componente Login montado en /login sea utilizado.
         route("/login", true);
       } catch (e) {
-        // Alternativa: usar window.location si por alguna razón route falla
         console.warn(
           "preact-router route() falló, usando window.location as fallback",
           e
