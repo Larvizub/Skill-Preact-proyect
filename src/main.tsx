@@ -15,6 +15,8 @@ import { Contactos } from "./pages/Contactos.tsx";
 import { Coordinadores } from "./pages/Coordinadores.tsx";
 import { Consultas } from "./pages/Consultas.tsx";
 import { CRM } from "./pages/CRM.tsx";
+import { CrearOportunidades } from "./pages/CrearOportunidades.tsx";
+import { OportunidadesDetalle } from "./pages/OportunidadesDetalle.tsx";
 import { Configuracion } from "./pages/Configuracion.tsx";
 import { ApiTest } from "./pages/ApiTest.tsx";
 import { Toaster } from "sonner";
@@ -56,6 +58,10 @@ function App() {
         <Coordinadores path="/coordinadores" />
         {/* @ts-ignore - preact-router path prop types */}
         <CRM path="/crm" />
+        {/* @ts-ignore - preact-router path prop types */}
+        <CrearOportunidades path="/crm/oportunidades/crear" />
+        {/* @ts-ignore - preact-router path prop types */}
+        <OportunidadesDetalle path="/crm/oportunidades/:opportunityId" />
         {/* @ts-ignore - preact-router path prop types */}
         <Consultas path="/consultas" />
         {/* @ts-ignore - preact-router path prop types */}
