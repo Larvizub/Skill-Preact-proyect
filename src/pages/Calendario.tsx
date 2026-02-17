@@ -145,6 +145,9 @@ export function Calendario() {
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(
     null
   );
+  const [hoverTooltipVisible, setHoverTooltipVisible] = useState(false);
+  const tooltipHideTimeoutRef = useRef<number | null>(null);
+  const tooltipRafRef = useRef<number | null>(null);
   const selectedDay = useMemo(() => {
     const parsed = parseDateLocal(selectedDayValue) || new Date(selectedDayValue);
     if (Number.isNaN(parsed.getTime())) return startOfDay(new Date());
@@ -1356,6 +1359,15 @@ export function Calendario() {
     target: HTMLElement,
     placement: "top" | "bottom" = "top"
   ) => {
+    if (tooltipHideTimeoutRef.current) {
+      window.clearTimeout(tooltipHideTimeoutRef.current);
+      tooltipHideTimeoutRef.current = null;
+    }
+    if (tooltipRafRef.current) {
+      window.cancelAnimationFrame(tooltipRafRef.current);
+      tooltipRafRef.current = null;
+    }
+
     const rect = target.getBoundingClientRect();
     const horizontalPadding = 20;
     const centerX = rect.left + rect.width / 2;
@@ -1371,9 +1383,37 @@ export function Calendario() {
       top: placement === "bottom" ? rect.bottom + 8 : rect.top - 8,
       placement,
     });
+
+    setHoverTooltipVisible(false);
+    tooltipRafRef.current = window.requestAnimationFrame(() => {
+      setHoverTooltipVisible(true);
+      tooltipRafRef.current = null;
+    });
   };
 
-  const hideEventTooltip = () => setHoverTooltip(null);
+  const hideEventTooltip = () => {
+    setHoverTooltipVisible(false);
+
+    if (tooltipHideTimeoutRef.current) {
+      window.clearTimeout(tooltipHideTimeoutRef.current);
+    }
+
+    tooltipHideTimeoutRef.current = window.setTimeout(() => {
+      setHoverTooltip(null);
+      tooltipHideTimeoutRef.current = null;
+    }, 140);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (tooltipHideTimeoutRef.current) {
+        window.clearTimeout(tooltipHideTimeoutRef.current);
+      }
+      if (tooltipRafRef.current) {
+        window.cancelAnimationFrame(tooltipRafRef.current);
+      }
+    };
+  }, []);
 
   const renderEventTooltipContent = (event: Event, timeLabel?: string) => {
     const statusText = getEventStatusText(event) || "No especificado";
@@ -2243,14 +2283,19 @@ export function Calendario() {
 
         {hoverTooltip && (
           <div
-            className="pointer-events-none fixed z-[9999] w-72 max-w-[calc(100vw-2rem)] rounded-md border bg-popover/95 p-2 shadow-2xl"
+            className="pointer-events-none fixed z-[9999] w-72 max-w-[calc(100vw-2rem)] rounded-md border bg-popover/95 p-2 shadow-2xl transition-all duration-150 ease-out"
             style={{
               left: hoverTooltip.left,
               top: hoverTooltip.top,
               transform:
                 hoverTooltip.placement === "bottom"
-                  ? "translate(-50%, 0)"
-                  : "translate(-50%, -100%)",
+                  ? hoverTooltipVisible
+                    ? "translate(-50%, 0) scale(1)"
+                    : "translate(-50%, -4px) scale(0.98)"
+                  : hoverTooltipVisible
+                  ? "translate(-50%, -100%) scale(1)"
+                  : "translate(-50%, calc(-100% - 4px)) scale(0.98)",
+              opacity: hoverTooltipVisible ? 1 : 0,
             }}
           >
             {renderEventTooltipContent(
