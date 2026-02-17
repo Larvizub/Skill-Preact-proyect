@@ -15,6 +15,7 @@ import { Contactos } from "./pages/Contactos.tsx";
 import { Coordinadores } from "./pages/Coordinadores.tsx";
 import { Consultas } from "./pages/Consultas.tsx";
 import { CRM } from "./pages/CRM.tsx";
+import { Configuracion } from "./pages/Configuracion.tsx";
 import { ApiTest } from "./pages/ApiTest.tsx";
 import { Toaster } from "sonner";
 import "./app.css";
@@ -57,6 +58,8 @@ function App() {
         <CRM path="/crm" />
         {/* @ts-ignore - preact-router path prop types */}
         <Consultas path="/consultas" />
+        {/* @ts-ignore - preact-router path prop types */}
+        <Configuracion path="/configuracion" />
       </Router>
     </ThemeProvider>
   );

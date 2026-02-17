@@ -970,9 +970,9 @@ export function CRM() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">CRM</h1>
+            <h1 className="text-3xl font-bold">Oportunidades</h1>
             <p className="text-muted-foreground">
-              Analítica comercial, seguimiento de oportunidades y timeline de avance.
+              Sección CRM para analítica comercial, seguimiento de oportunidades y timeline de avance.
             </p>
           </div>
 

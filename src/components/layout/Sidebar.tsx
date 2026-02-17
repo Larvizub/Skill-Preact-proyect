@@ -15,7 +15,12 @@ import {
   Search,
   LogOut,
   BriefcaseBusiness,
+  Settings,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-preact";
+import { useMemo, useState } from "preact/hooks";
+import type { LucideIcon } from "lucide-preact";
 import { useTheme } from "../../contexts/ThemeContext";
 import { cn } from "../../lib/utils";
 import { authService } from "../../services/auth.service";
@@ -26,26 +31,76 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-const menuItems = [
-  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/crm", label: "CRM", icon: BriefcaseBusiness },
-  { path: "/eventos", label: "Eventos", icon: ClipboardList },
-  { path: "/calendario", label: "Calendario", icon: Calendar },
-  { path: "/consultas", label: "Consulta Servicios", icon: Search },
-  { path: "/salones", label: "Salones", icon: Building },
+interface MenuItem {
+  id: string;
+  path?: string;
+  label: string;
+  icon: LucideIcon;
+  children?: Array<Omit<MenuItem, "children">>;
+}
+
+const menuItems: MenuItem[] = [
+  { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "calendario", path: "/calendario", label: "Calendario", icon: Calendar },
   {
-    path: "/salones-disponibles",
-    label: "Salones Disponibles",
-    icon: CalendarCheck,
+    id: "crm",
+    label: "CRM",
+    icon: BriefcaseBusiness,
+    children: [
+      {
+        id: "crm-oportunidades",
+        path: "/crm",
+        label: "Oportunidades",
+        icon: BriefcaseBusiness,
+      },
+    ],
   },
-  { path: "/inventario", label: "Inventario", icon: Package },
-  { path: "/clientes", label: "Clientes", icon: Users },
-  { path: "/contactos", label: "Contactos", icon: UserCircle },
-  { path: "/coordinadores", label: "Coordinadores", icon: UserCog },
+  {
+    id: "skill",
+    label: "SKILL",
+    icon: ClipboardList,
+    children: [
+      { id: "eventos", path: "/eventos", label: "Eventos", icon: ClipboardList },
+      { id: "consultas", path: "/consultas", label: "Consulta de Servicios", icon: Search },
+      { id: "salones", path: "/salones", label: "Salones", icon: Building },
+      {
+        id: "salones-disponibles",
+        path: "/salones-disponibles",
+        label: "Salones Disponibles",
+        icon: CalendarCheck,
+      },
+      { id: "inventario", path: "/inventario", label: "Inventario", icon: Package },
+      { id: "clientes", path: "/clientes", label: "Clientes", icon: Users },
+      { id: "contactos", path: "/contactos", label: "Contactos", icon: UserCircle },
+      { id: "coordinadores", path: "/coordinadores", label: "Coordinadores", icon: UserCog },
+    ],
+  },
+  { id: "configuracion", path: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
 export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
   const { theme, setTheme } = useTheme();
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    crm: true,
+    skill: true,
+  });
+
+  const currentPath =
+    typeof window !== "undefined" ? window.location.pathname : "";
+
+  const isPathActive = (path?: string) => {
+    if (!path) return false;
+    return currentPath === path || currentPath.startsWith(`${path}/`);
+  };
+
+  const groupsWithActiveChild = useMemo(() => {
+    const activeGroups: Record<string, boolean> = {};
+    menuItems.forEach((item) => {
+      if (!item.children) return;
+      activeGroups[item.id] = item.children.some((child) => isPathActive(child.path));
+    });
+    return activeGroups;
+  }, [currentPath]);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -65,6 +120,13 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
     if (onClose) {
       onClose();
     }
+  };
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
   };
 
   return (
@@ -118,21 +180,71 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
         <nav className="flex-1 overflow-y-auto py-4">
           <ul className="space-y-1 px-3">
             {menuItems.map((item) => {
-              const isActive =
-                typeof window !== "undefined" &&
-                window.location.pathname === item.path;
+              const hasChildren = Boolean(item.children?.length);
+              const isGroupActive = hasChildren
+                ? groupsWithActiveChild[item.id]
+                : isPathActive(item.path);
+              const isGroupExpanded = hasChildren
+                ? expandedGroups[item.id] || groupsWithActiveChild[item.id]
+                : false;
+
               return (
-                <li key={item.path}>
-                  <button
-                    onClick={() => handleNavigate(item.path)}
-                    className={cn(
-                      "flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground text-left",
-                      isActive && "bg-primary text-primary-foreground"
-                    )}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </button>
+                <li key={item.id}>
+                  {hasChildren ? (
+                    <>
+                      <button
+                        onClick={() => toggleGroup(item.id)}
+                        className={cn(
+                          "flex items-center gap-3 w-full px-3 py-2 rounded-md text-[13px] font-medium transition-colors hover:bg-accent hover:text-accent-foreground text-left",
+                          isGroupActive && "bg-primary text-primary-foreground"
+                        )}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        <span className="flex-1">{item.label}</span>
+                        {isGroupExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </button>
+
+                      {isGroupExpanded && (
+                        <div className="relative mt-1 ml-5 pl-4">
+                          <span className="absolute left-0 top-1 bottom-1 w-px bg-border rounded-full" />
+                          <ul className="space-y-1">
+                            {item.children?.map((child) => {
+                              const isChildActive = isPathActive(child.path);
+                              return (
+                                <li key={child.id}>
+                                  <button
+                                    onClick={() => child.path && handleNavigate(child.path)}
+                                    className={cn(
+                                      "flex items-center gap-3 w-full px-3 py-2 rounded-md text-xs transition-colors hover:bg-accent hover:text-accent-foreground text-left",
+                                      isChildActive && "bg-primary text-primary-foreground font-medium"
+                                    )}
+                                  >
+                                    <child.icon className="w-4 h-4" />
+                                    <span>{child.label}</span>
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => item.path && handleNavigate(item.path)}
+                      className={cn(
+                        "flex items-center gap-3 w-full px-3 py-2 rounded-md text-[13px] font-medium transition-colors hover:bg-accent hover:text-accent-foreground text-left",
+                        isGroupActive && "bg-primary text-primary-foreground"
+                      )}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span>{item.label}</span>
+                    </button>
+                  )}
                 </li>
               );
             })}
