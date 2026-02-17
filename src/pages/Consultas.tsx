@@ -16,6 +16,7 @@ import {
 } from "../components/ui/table";
 import { FilterPill } from "../components/ui/FilterPill";
 import { apiService, type Event, type Service } from "../services/api.service";
+import { authService } from "../services/auth.service";
 import {
   Search,
   Calendar,
@@ -494,10 +495,15 @@ export function Consultas() {
   };
 
   const formatCurrency = (value: number) => {
+    const recinto = authService.getRecinto();
+    const currencyCode = recinto === "CCCR" ? "USD" : "COP";
+
     return new Intl.NumberFormat("es-CR", {
       style: "currency",
-      currency: "USD",
+      currency: currencyCode,
+      currencyDisplay: "code",
       minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
