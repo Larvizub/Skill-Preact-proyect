@@ -33,6 +33,7 @@ import {
   generateRoomsTotalsExcelReport,
   getRoomPriceInfo,
 } from "../lib/roomsReportUtils";
+import { authService } from "../services/auth.service";
 import { toast } from "sonner";
 
 export function Salones() {
@@ -85,12 +86,16 @@ export function Salones() {
     }
   };
 
-  const formatCurrency = (value: number | null, currency: string) => {
+  const formatCurrency = (value: number | null) => {
     if (value === null || !Number.isFinite(value)) return "N/D";
+
+    const recinto = authService.getRecinto();
+    const currencyCode = recinto === "CCCR" ? "USD" : "COP";
 
     return new Intl.NumberFormat("es-CR", {
       style: "currency",
-      currency: currency || "USD",
+      currency: currencyCode,
+      currencyDisplay: "code",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
@@ -306,7 +311,7 @@ export function Salones() {
                               Cargando...
                             </span>
                           ) : roomPriceInfo.price !== null ? (
-                            formatCurrency(roomPriceInfo.price, roomPriceInfo.currency)
+                            formatCurrency(roomPriceInfo.price)
                           ) : (
                             <span className="text-xs text-muted-foreground">Sin tarifa</span>
                           )}
