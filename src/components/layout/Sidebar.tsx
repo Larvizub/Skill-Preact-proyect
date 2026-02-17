@@ -47,9 +47,15 @@ const menuItems: MenuItem[] = [
     icon: BriefcaseBusiness,
     children: [
       {
-        id: "crm-oportunidades",
+        id: "crm-gestion",
         path: "/crm",
-        label: "Oportunidades",
+        label: "Gestión CRM",
+        icon: BriefcaseBusiness,
+      },
+      {
+        id: "crm-consulta-oportunidades",
+        path: "/crm/oportunidades",
+        label: "Consulta Oportunidades",
         icon: BriefcaseBusiness,
       },
     ],
@@ -89,13 +95,18 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
     return currentPath === path || currentPath.startsWith(`${path}/`);
   };
 
-  const groupsWithActiveChild = useMemo(() => {
-    const activeGroups: Record<string, boolean> = {};
+  const activeChildByGroup = useMemo(() => {
+    const activeChildren: Record<string, string | undefined> = {};
     menuItems.forEach((item) => {
       if (!item.children) return;
-      activeGroups[item.id] = item.children.some((child) => isPathActive(child.path));
+
+      const matchedChild = item.children
+        .filter((child) => isPathActive(child.path))
+        .sort((a, b) => (b.path?.length || 0) - (a.path?.length || 0))[0];
+
+      activeChildren[item.id] = matchedChild?.id;
     });
-    return activeGroups;
+    return activeChildren;
   }, [currentPath]);
 
   const toggleTheme = () => {
@@ -178,10 +189,10 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
             {menuItems.map((item) => {
               const hasChildren = Boolean(item.children?.length);
               const isGroupActive = hasChildren
-                ? groupsWithActiveChild[item.id]
+                ? Boolean(activeChildByGroup[item.id])
                 : isPathActive(item.path);
               const isGroupExpanded = hasChildren
-                ? expandedGroups[item.id] || groupsWithActiveChild[item.id]
+                ? expandedGroups[item.id] || Boolean(activeChildByGroup[item.id])
                 : false;
 
               return (
@@ -219,7 +230,7 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
                             <span className="absolute left-0 top-1 bottom-1 w-px bg-border rounded-full" />
                             <ul className="space-y-1 pb-1">
                               {item.children?.map((child) => {
-                                const isChildActive = isPathActive(child.path);
+                                const isChildActive = activeChildByGroup[item.id] === child.id;
                                 return (
                                   <li key={child.id}>
                                     <button

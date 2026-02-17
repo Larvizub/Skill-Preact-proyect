@@ -385,9 +385,9 @@ export function CRM() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Oportunidades</h1>
+            <h1 className="text-3xl font-bold">Gestión CRM</h1>
             <p className="text-muted-foreground">
-              Sección CRM para analítica comercial, seguimiento de oportunidades y timeline de avance.
+              Módulo de gestión comercial, seguimiento de oportunidades y timeline de avance.
             </p>
           </div>
 
