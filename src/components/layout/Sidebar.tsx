@@ -17,7 +17,6 @@ import {
   BriefcaseBusiness,
   Settings,
   ChevronRight,
-  ChevronDown,
 } from "lucide-preact";
 import { useMemo, useState } from "preact/hooks";
 import type { LucideIcon } from "lucide-preact";
@@ -80,10 +79,7 @@ const menuItems: MenuItem[] = [
 
 export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
   const { theme, setTheme } = useTheme();
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    crm: true,
-    skill: true,
-  });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const currentPath =
     typeof window !== "undefined" ? window.location.pathname : "";
@@ -201,37 +197,48 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
                       >
                         <item.icon className="w-5 h-5" />
                         <span className="flex-1">{item.label}</span>
-                        {isGroupExpanded ? (
-                          <ChevronDown className="w-4 h-4" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )}
+                        <ChevronRight
+                          className={cn(
+                            "w-4 h-4 transition-transform duration-200 ease-out",
+                            isGroupExpanded && "rotate-90"
+                          )}
+                        />
                       </button>
 
-                      {isGroupExpanded && (
-                        <div className="relative mt-1 ml-5 pl-4">
-                          <span className="absolute left-0 top-1 bottom-1 w-px bg-border rounded-full" />
-                          <ul className="space-y-1">
-                            {item.children?.map((child) => {
-                              const isChildActive = isPathActive(child.path);
-                              return (
-                                <li key={child.id}>
-                                  <button
-                                    onClick={() => child.path && handleNavigate(child.path)}
-                                    className={cn(
-                                      "flex items-center gap-3 w-full px-3 py-2 rounded-md text-xs transition-colors hover:bg-accent hover:text-accent-foreground text-left",
-                                      isChildActive && "bg-primary text-primary-foreground font-medium"
-                                    )}
-                                  >
-                                    <child.icon className="w-4 h-4" />
-                                    <span>{child.label}</span>
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
+                      <div
+                        className={cn(
+                          "grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out",
+                          isGroupExpanded
+                            ? "grid-rows-[1fr] opacity-100 mt-1"
+                            : "grid-rows-[0fr] opacity-0 mt-0"
+                        )}
+                        aria-hidden={!isGroupExpanded}
+                      >
+                        <div className="overflow-hidden">
+                          <div className="relative ml-5 pl-4">
+                            <span className="absolute left-0 top-1 bottom-1 w-px bg-border rounded-full" />
+                            <ul className="space-y-1 pb-1">
+                              {item.children?.map((child) => {
+                                const isChildActive = isPathActive(child.path);
+                                return (
+                                  <li key={child.id}>
+                                    <button
+                                      onClick={() => child.path && handleNavigate(child.path)}
+                                      className={cn(
+                                        "flex items-center gap-3 w-full px-3 py-2 rounded-md text-xs transition-colors hover:bg-accent hover:text-accent-foreground text-left",
+                                        isChildActive && "bg-primary text-primary-foreground font-medium"
+                                      )}
+                                    >
+                                      <child.icon className="w-4 h-4" />
+                                      <span>{child.label}</span>
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </>
                   ) : (
                     <button
