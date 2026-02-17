@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
 import { Layout } from "../components/layout/Layout";
 import {
@@ -10,8 +10,9 @@ import {
 import { Button } from "../components/ui/button";
 import { DatePicker } from "../components/ui/datepicker";
 import { Spinner } from "../components/ui/spinner";
+import { Select } from "../components/ui/select";
 import { apiService } from "../services/api.service";
-import type { Event, Room } from "../services/api.service";
+import type { Event, Room, Schedule } from "../services/api.service";
 import {
   ChevronLeft,
   ChevronRight,
@@ -53,8 +54,13 @@ import { parseDateLocal } from "../lib/dateUtils";
 const MAX_VISIBLE_EVENTS = 3;
 const GANTT_DAY_WIDTH = 44;
 const GANTT_ROOM_COL_WIDTH = 220;
+const DAY_HOUR_WIDTH = 56;
+const DAY_EVENT_COL_WIDTH = 280;
+const MINUTES_IN_DAY = 24 * 60;
+const DAY_SCHEDULE_TIMEOUT_MS = 3000;
+const DAY_SCHEDULE_MAX_CONCURRENCY = 8;
 
-type CalendarView = "month" | "rooms";
+type CalendarView = "month" | "rooms" | "day";
 
 interface RoomLane {
   key: string;
@@ -67,6 +73,23 @@ interface LaneSegment {
   startIndex: number;
   endIndex: number;
   track: number;
+}
+
+interface DayTimeSegment {
+  startMinutes: number;
+  endMinutes: number;
+  label: string;
+}
+
+interface DayRoomSegment extends DayTimeSegment {
+  event: Event;
+  statusText: string;
+  track: number;
+}
+
+interface DayRoomRow {
+  lane: RoomLane;
+  segments: DayRoomSegment[];
 }
 
 export function Calendario() {
@@ -83,8 +106,30 @@ export function Calendario() {
   const [segmentFilters, setSegmentFilters] = useState<Record<string, boolean>>(
     {}
   );
+  const [selectedRoomLaneKey, setSelectedRoomLaneKey] = useState("");
+  const [daySchedulesByEventId, setDaySchedulesByEventId] = useState<
+    Record<number, Schedule[]>
+  >({});
+  const [daySchedulesLoading, setDaySchedulesLoading] = useState(false);
+  const [selectedDayValue, setSelectedDayValue] = useState(() =>
+    format(new Date(), "yyyy-MM-dd")
+  );
+  const daySchedulesCacheRef = useRef<Record<number, Schedule[]>>({});
   const [baseSegments, setBaseSegments] = useState<SegmentOption[]>([]);
   const [segmentsLoading, setSegmentsLoading] = useState(true);
+  const selectedDay = useMemo(() => {
+    const parsed = parseDateLocal(selectedDayValue) || new Date(selectedDayValue);
+    if (Number.isNaN(parsed.getTime())) return startOfDay(new Date());
+    return startOfDay(parsed);
+  }, [selectedDayValue]);
+  const selectedDayKey = useMemo(
+    () => format(selectedDay, "yyyy-MM-dd"),
+    [selectedDay]
+  );
+  const dayHours = useMemo(
+    () => Array.from({ length: 24 }, (_, index) => index),
+    []
+  );
 
   // Helper: countdown for events in opcion1/2/3
   const getCountdownMsForEvent = (event: Event): number | null => {
@@ -138,12 +183,6 @@ export function Calendario() {
         apiService.getEvents(start, end),
         apiService.getRooms().catch(() => []),
       ]);
-
-      // Log para debugging - ver estructura de eventos
-      if (eventsData.length > 0) {
-        console.log("Primer evento recibido:", eventsData[0]);
-        console.log("EventStatus del primer evento:", eventsData[0].eventStatus);
-      }
 
       setEvents(eventsData);
       const activeRooms = (roomsData as Room[])
@@ -306,6 +345,493 @@ export function Calendario() {
       }),
     [events, statusFilters, segmentFilters]
   );
+
+  const dayEvents = useMemo(
+    () =>
+      filteredEvents.filter((event) => {
+        const eventStart = startOfDay(
+          parseDateLocal(event.startDate) || new Date(event.startDate)
+        );
+        const eventEnd = startOfDay(
+          parseDateLocal(event.endDate) || new Date(event.endDate)
+        );
+
+        return isWithinInterval(selectedDay, { start: eventStart, end: eventEnd });
+      }),
+    [filteredEvents, selectedDay]
+  );
+
+  const parseTimeToMinutes = (value?: string | null) => {
+    if (!value || typeof value !== "string") return null;
+
+    const trimmed = value.trim();
+
+    const parseDateTimeString = (input: string) => {
+      const normalized = input.includes("T") ? input : input.replace(" ", "T");
+      const parsed = new Date(normalized);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.getHours() * 60 + parsed.getMinutes();
+    };
+
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      return parseDateTimeString(trimmed);
+    }
+
+    const match24h = trimmed.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+
+    if (match24h) {
+      const hours = Number(match24h[1]);
+      const minutes = Number(match24h[2]);
+
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+      if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+      return hours * 60 + minutes;
+    }
+
+    const match12h = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match12h) return null;
+
+    let hours = Number(match12h[1]);
+    const minutes = Number(match12h[2]);
+    const meridiem = match12h[3].toUpperCase();
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+    if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return null;
+
+    if (meridiem === "AM" && hours === 12) hours = 0;
+    if (meridiem === "PM" && hours !== 12) hours += 12;
+
+    return hours * 60 + minutes;
+  };
+
+  const getDateKey = (value: unknown) => {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return null;
+      return format(startOfDay(value), "yyyy-MM-dd");
+    }
+
+    if (typeof value === "string") {
+      const ddmmyyyy = value.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+      if (ddmmyyyy) {
+        const normalized = `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}T00:00:00`;
+        const parsedLocal = new Date(normalized);
+        if (!Number.isNaN(parsedLocal.getTime())) {
+          return format(startOfDay(parsedLocal), "yyyy-MM-dd");
+        }
+      }
+
+      const normalized = value.includes("T") ? value : value.replace(" ", "T");
+      const parsed = parseDateLocal(value) || new Date(normalized);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return format(startOfDay(parsed), "yyyy-MM-dd");
+    }
+
+    return null;
+  };
+
+  const getActivitySegments = (event: Event): DayTimeSegment[] => {
+    const rawActivities = (event as any)?.activities;
+    if (!Array.isArray(rawActivities) || rawActivities.length === 0) return [];
+
+    const segments: DayTimeSegment[] = [];
+    const visited = new WeakSet<object>();
+
+    const dateKeyHints = [
+      "date",
+      "activityDate",
+      "eventActivityStartDate",
+      "eventActivityEndDate",
+      "startDate",
+      "endDate",
+      "scheduledDate",
+    ];
+    const startHints = [
+      "eventActivityStartDate",
+      "roomReservationFromDate",
+      "startTime",
+      "activityStartTime",
+      "startHour",
+      "hourFrom",
+      "fromTime",
+      "timeFrom",
+    ];
+    const endHints = [
+      "eventActivityEndDate",
+      "roomReservationToDate",
+      "endTime",
+      "activityEndTime",
+      "endHour",
+      "hourTo",
+      "toTime",
+      "timeTo",
+      "finishTime",
+    ];
+
+    const pickValueByHints = (source: any, hints: string[]) => {
+      for (const hint of hints) {
+        if (source?.[hint] != null) {
+          return source[hint];
+        }
+      }
+      return null;
+    };
+
+    const collectDateKeys = (value: any, keys: Set<string>) => {
+      if (value == null) return;
+
+      if (Array.isArray(value)) {
+        value.forEach((item) => collectDateKeys(item, keys));
+        return;
+      }
+
+      if (typeof value === "object") {
+        if (visited.has(value)) return;
+        visited.add(value);
+
+        Object.entries(value).forEach(([key, nested]) => {
+          const normalizedKey = key.toLowerCase();
+          if (dateKeyHints.some((hint) => normalizedKey.includes(hint.toLowerCase()))) {
+            const keyValue = getDateKey(nested);
+            if (keyValue) keys.add(keyValue);
+          }
+
+          collectDateKeys(nested, keys);
+        });
+      }
+    };
+
+    rawActivities.forEach((activity: any) => {
+      const explicitActivityDate = getDateKey(activity?.activityDate);
+      const explicitStartRaw =
+        activity?.startTime ?? activity?.eventActivityStartDate ?? null;
+      const explicitEndRaw =
+        activity?.endTime ?? activity?.eventActivityEndDate ?? null;
+
+      const startFromExplicit = parseTimeToMinutes(
+        typeof explicitStartRaw === "string"
+          ? explicitStartRaw
+          : String(explicitStartRaw ?? "")
+      );
+      const endFromExplicit = parseTimeToMinutes(
+        typeof explicitEndRaw === "string"
+          ? explicitEndRaw
+          : String(explicitEndRaw ?? "")
+      );
+
+      const startDateFromExplicit = getDateKey(explicitStartRaw);
+      const endDateFromExplicit = getDateKey(explicitEndRaw);
+      const explicitDateMatchesToday =
+        explicitActivityDate === selectedDayKey ||
+        startDateFromExplicit === selectedDayKey ||
+        endDateFromExplicit === selectedDayKey;
+
+      if (
+        explicitDateMatchesToday &&
+        startFromExplicit != null &&
+        endFromExplicit != null
+      ) {
+        const normalizedStart = Math.max(
+          0,
+          Math.min(startFromExplicit, MINUTES_IN_DAY - 1)
+        );
+        const normalizedEnd = Math.max(
+          normalizedStart + 15,
+          Math.min(endFromExplicit, MINUTES_IN_DAY)
+        );
+
+        const formatLabelTime = (raw: unknown) => {
+          if (typeof raw !== "string") return "--:--";
+          const text = raw.trim();
+          const timeMatch = text.match(/(\d{1,2}:\d{2})(?::\d{2})?/);
+          if (timeMatch) return timeMatch[1].padStart(5, "0");
+          return text.length >= 5 ? text.slice(0, 5) : "--:--";
+        };
+
+        segments.push({
+          startMinutes: normalizedStart,
+          endMinutes: normalizedEnd,
+          label: `${formatLabelTime(explicitStartRaw)} - ${formatLabelTime(
+            explicitEndRaw
+          )}`,
+        });
+        return;
+      }
+
+      const activityDateKeys = new Set<string>();
+      collectDateKeys(activity, activityDateKeys);
+
+      const hasDateInfo = activityDateKeys.size > 0;
+      if (hasDateInfo && !activityDateKeys.has(selectedDayKey)) {
+        return;
+      }
+
+      const directStart = pickValueByHints(activity, startHints);
+      const directEnd = pickValueByHints(activity, endHints);
+
+      const nestedContainers = [
+        activity?.schedule,
+        activity?.schedules,
+        activity?.activitySchedule,
+      ].flatMap((entry) => (Array.isArray(entry) ? entry : [entry]));
+
+      const pairs: Array<{ startRaw: unknown; endRaw: unknown }> = [];
+
+      if (directStart != null || directEnd != null) {
+        pairs.push({ startRaw: directStart, endRaw: directEnd });
+      }
+
+      nestedContainers.forEach((container) => {
+        if (!container || typeof container !== "object") return;
+
+        const startRaw = pickValueByHints(container, startHints);
+        const endRaw = pickValueByHints(container, endHints);
+        if (startRaw != null || endRaw != null) {
+          pairs.push({ startRaw, endRaw });
+        }
+      });
+
+      pairs.forEach(({ startRaw, endRaw }) => {
+        const start = parseTimeToMinutes(
+          typeof startRaw === "string" ? startRaw : String(startRaw || "")
+        );
+        const end = parseTimeToMinutes(
+          typeof endRaw === "string" ? endRaw : String(endRaw || "")
+        );
+
+        if (start == null && end == null) return;
+
+        const normalizedStart = Math.max(
+          0,
+          Math.min(start ?? end ?? 0, MINUTES_IN_DAY - 1)
+        );
+        const normalizedEnd = Math.max(
+          normalizedStart + 15,
+          Math.min(end ?? start ?? MINUTES_IN_DAY, MINUTES_IN_DAY)
+        );
+
+        const formatLabelTime = (raw: unknown) => {
+          if (typeof raw !== "string") return "--:--";
+          const text = raw.trim();
+          const timeMatch = text.match(/(\d{1,2}:\d{2})(?::\d{2})?/);
+          if (timeMatch) return timeMatch[1].padStart(5, "0");
+          return text.length >= 5 ? text.slice(0, 5) : "--:--";
+        };
+
+        const startLabel = formatLabelTime(startRaw);
+        const endLabel = formatLabelTime(endRaw);
+
+        segments.push({
+          startMinutes: normalizedStart,
+          endMinutes: normalizedEnd,
+          label: `${startLabel} - ${endLabel}`,
+        });
+      });
+    });
+
+    return segments.sort((a, b) => a.startMinutes - b.startMinutes);
+  };
+
+  const activitySegmentsByEventId = useMemo(() => {
+    const map: Record<number, DayTimeSegment[]> = {};
+
+    dayEvents.forEach((event) => {
+      map[event.idEvent] = getActivitySegments(event);
+    });
+
+    return map;
+  }, [dayEvents, selectedDayKey]);
+
+  const dayEventsNeedingScheduleLookup = useMemo(
+    () => dayEvents.filter((event) => (activitySegmentsByEventId[event.idEvent] || []).length === 0),
+    [dayEvents, activitySegmentsByEventId]
+  );
+
+  const hasAnyActivityScheduleForDay = useMemo(
+    () => dayEventsNeedingScheduleLookup.length < dayEvents.length,
+    [dayEvents.length, dayEventsNeedingScheduleLookup.length]
+  );
+
+  useEffect(() => {
+    if (calendarView !== "day") return;
+    if (dayEvents.length === 0) {
+      setDaySchedulesByEventId({});
+      setDaySchedulesLoading(false);
+      return;
+    }
+
+    if (hasAnyActivityScheduleForDay) {
+      setDaySchedulesByEventId({});
+      setDaySchedulesLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    const cachedMap: Record<number, Schedule[]> = {};
+    const pendingEvents = dayEventsNeedingScheduleLookup.filter((event) => {
+      const cached = daySchedulesCacheRef.current[event.idEvent];
+      if (cached) {
+        cachedMap[event.idEvent] = cached;
+        return false;
+      }
+      return true;
+    });
+
+    setDaySchedulesByEventId(cachedMap);
+
+    if (pendingEvents.length === 0) {
+      setDaySchedulesLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setDaySchedulesLoading(!hasAnyActivityScheduleForDay);
+
+    const fetchWithTimeout = async (eventNumber: number) => {
+      const timeoutPromise = new Promise<Schedule[]>((resolve) => {
+        setTimeout(() => resolve([]), DAY_SCHEDULE_TIMEOUT_MS);
+      });
+
+      const schedulesPromise = apiService
+        .getSchedules(undefined, undefined, eventNumber)
+        .catch(() => [] as Schedule[]);
+
+      return Promise.race([schedulesPromise, timeoutPromise]);
+    };
+
+    const loadSchedules = async () => {
+      const entries: Array<readonly [number, Schedule[]]> = [];
+
+      for (
+        let offset = 0;
+        offset < pendingEvents.length;
+        offset += DAY_SCHEDULE_MAX_CONCURRENCY
+      ) {
+        const chunk = pendingEvents.slice(
+          offset,
+          offset + DAY_SCHEDULE_MAX_CONCURRENCY
+        );
+
+        const chunkEntries = await Promise.all(
+          chunk.map(async (event) => {
+            const eventNumber = Number(
+              (event as any)?.eventNumber ?? event.eventNumber
+            );
+
+            if (!eventNumber || Number.isNaN(eventNumber)) {
+              return [event.idEvent, [] as Schedule[]] as const;
+            }
+
+            const schedules = await fetchWithTimeout(eventNumber);
+
+            const todaySchedules = (schedules || []).filter((schedule) => {
+              const scheduleDate =
+                parseDateLocal(schedule.date) || new Date(schedule.date);
+              if (Number.isNaN(scheduleDate.getTime())) return false;
+
+              return (
+                format(startOfDay(scheduleDate), "yyyy-MM-dd") ===
+                selectedDayKey
+              );
+            });
+
+            return [event.idEvent, todaySchedules] as const;
+          })
+        );
+
+        entries.push(...chunkEntries);
+      }
+
+      if (!active) return;
+
+      const fetchedMap: Record<number, Schedule[]> = {};
+      entries.forEach(([eventId, schedules]) => {
+        fetchedMap[eventId] = schedules;
+      });
+
+      daySchedulesCacheRef.current = {
+        ...daySchedulesCacheRef.current,
+        ...fetchedMap,
+      };
+
+      setDaySchedulesByEventId({
+        ...cachedMap,
+        ...fetchedMap,
+      });
+      setDaySchedulesLoading(false);
+    };
+
+    loadSchedules().catch(() => {
+      if (!active) return;
+      setDaySchedulesLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    calendarView,
+    dayEvents,
+    dayEventsNeedingScheduleLookup,
+    hasAnyActivityScheduleForDay,
+    selectedDayKey,
+  ]);
+
+  const dayEventSegmentsByEventId = useMemo(() => {
+    const map: Record<number, DayTimeSegment[]> = {};
+
+    dayEvents.forEach((event) => {
+      const activitySegments = activitySegmentsByEventId[event.idEvent] || [];
+      if (activitySegments.length > 0) {
+        map[event.idEvent] = activitySegments;
+        return;
+      }
+
+      const schedules = daySchedulesByEventId[event.idEvent] || [];
+
+      const scheduleSegments: DayTimeSegment[] = schedules
+        .map((schedule) => {
+          const start = parseTimeToMinutes(schedule.startTime);
+          const end = parseTimeToMinutes(schedule.endTime);
+
+          if (start == null || end == null) return null;
+
+          const normalizedStart = Math.max(0, Math.min(start, MINUTES_IN_DAY - 1));
+          const normalizedEnd = Math.max(
+            normalizedStart + 15,
+            Math.min(end, MINUTES_IN_DAY)
+          );
+
+          return {
+            startMinutes: normalizedStart,
+            endMinutes: normalizedEnd,
+            label: `${schedule.startTime?.slice(0, 5) || "--:--"} - ${
+              schedule.endTime?.slice(0, 5) || "--:--"
+            }`,
+          };
+        })
+        .filter(Boolean) as DayTimeSegment[];
+
+      if (scheduleSegments.length > 0) {
+        map[event.idEvent] = scheduleSegments;
+        return;
+      }
+
+      map[event.idEvent] = [
+        {
+          startMinutes: 0,
+          endMinutes: MINUTES_IN_DAY,
+          label: "Sin horario",
+        },
+      ];
+    });
+
+    return map;
+  }, [dayEvents, daySchedulesByEventId, activitySegmentsByEventId]);
 
   const monthStartDay = startOfDay(monthStart);
   const monthEndDay = startOfDay(monthEnd);
@@ -491,6 +1017,67 @@ export function Calendario() {
     return { lanes, extractLaneKeys };
   }, [filteredEvents, rooms, monthStartDay, monthEndDay]);
 
+  const dayRoomRows = useMemo<DayRoomRow[]>(() => {
+    const usedLaneKeys = new Set<string>();
+    const rawSegmentsByLane = new Map<string, DayRoomSegment[]>();
+
+    dayEvents.forEach((event) => {
+      const laneKeys = roomLanes.extractLaneKeys(event);
+      const eventSegments = dayEventSegmentsByEventId[event.idEvent] || [];
+      const statusText = getEventStatusText(event) || "No especificado";
+
+      laneKeys.forEach((laneKey) => {
+        usedLaneKeys.add(laneKey);
+        if (!rawSegmentsByLane.has(laneKey)) {
+          rawSegmentsByLane.set(laneKey, []);
+        }
+
+        eventSegments.forEach((segment) => {
+          rawSegmentsByLane.get(laneKey)!.push({
+            ...segment,
+            event,
+            statusText,
+            track: 0,
+          });
+        });
+      });
+    });
+
+    const lanes = roomLanes.lanes.filter((lane) => usedLaneKeys.has(lane.key));
+
+    return lanes.map((lane) => {
+      const segments = rawSegmentsByLane.get(lane.key) || [];
+      const sorted = [...segments].sort((a, b) => {
+        if (a.startMinutes !== b.startMinutes) {
+          return a.startMinutes - b.startMinutes;
+        }
+        return a.endMinutes - b.endMinutes;
+      });
+
+      const trackEndByIndex: number[] = [];
+      const packed = sorted.map((segment) => {
+        let track = 0;
+        while (
+          track < trackEndByIndex.length &&
+          trackEndByIndex[track] > segment.startMinutes
+        ) {
+          track += 1;
+        }
+        trackEndByIndex[track] = segment.endMinutes;
+
+        return {
+          ...segment,
+          track,
+        };
+      });
+
+      return {
+        lane,
+        segments: packed,
+      };
+    });
+  }, [dayEvents, dayEventSegmentsByEventId, roomLanes]);
+
   const laneSegmentsByKey = useMemo(() => {
     const map = new Map<string, LaneSegment[]>();
 
@@ -557,6 +1144,23 @@ export function Calendario() {
 
     return map;
   }, [days.length, filteredEvents, roomLanes, monthStartDay, monthEndDay]);
+
+  useEffect(() => {
+    if (!selectedRoomLaneKey) return;
+
+    const exists = roomLanes.lanes.some((lane) => lane.key === selectedRoomLaneKey);
+    if (!exists) {
+      setSelectedRoomLaneKey("");
+    }
+  }, [roomLanes.lanes, selectedRoomLaneKey]);
+
+  const visibleRoomLanes = useMemo(() => {
+    if (!selectedRoomLaneKey) {
+      return roomLanes.lanes;
+    }
+
+    return roomLanes.lanes.filter((lane) => lane.key === selectedRoomLaneKey);
+  }, [roomLanes.lanes, selectedRoomLaneKey]);
 
   const getEventsSpanningDate = (date: Date) => {
     return filteredEvents.filter((event) => {
@@ -699,6 +1303,15 @@ export function Calendario() {
                 >
                   Salones
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={calendarView === "day" ? "default" : "ghost"}
+                  className="h-8"
+                  onClick={() => setCalendarView("day")}
+                >
+                  Día
+                </Button>
               </div>
             </div>
 
@@ -746,6 +1359,43 @@ export function Calendario() {
                 </FilterPill>
               ))}
             </div>
+
+            {calendarView === "rooms" && (
+              <div className="mt-4 max-w-sm border-t pt-4">
+                <span className="mb-2 block text-xs font-medium text-foreground">
+                  Filtrar por salón
+                </span>
+                <Select
+                  value={selectedRoomLaneKey}
+                  onChange={(e) =>
+                    setSelectedRoomLaneKey((e.target as HTMLSelectElement).value)
+                  }
+                >
+                  <option value="">Todos los salones</option>
+                  {roomLanes.lanes.map((lane) => (
+                    <option key={lane.key} value={lane.key}>
+                      {lane.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+
+            {calendarView === "day" && (
+              <div className="mt-4 max-w-sm border-t pt-4">
+                <span className="mb-2 block text-xs font-medium text-foreground">
+                  Seleccionar día
+                </span>
+                <DatePicker
+                  value={selectedDayValue}
+                  onChange={(dateStr: string) => {
+                    const parsed = parseDateLocal(dateStr) || new Date(dateStr);
+                    if (Number.isNaN(parsed.getTime())) return;
+                    setSelectedDayValue(format(parsed, "yyyy-MM-dd"));
+                  }}
+                />
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -753,9 +1403,9 @@ export function Calendario() {
                 <Spinner size="md" />
               </div>
             ) : calendarView === "rooms" ? (
-              roomLanes.lanes.length === 0 ? (
+              visibleRoomLanes.length === 0 ? (
                 <div className="py-8 text-center text-sm text-muted-foreground">
-                  No hay eventos con salón asignado para este mes.
+                  No hay eventos para el salón seleccionado en este mes.
                 </div>
               ) : (
                 <div className="overflow-auto rounded-md border">
@@ -791,7 +1441,7 @@ export function Calendario() {
                       ))}
                     </div>
 
-                    {roomLanes.lanes.map((lane) => {
+                    {visibleRoomLanes.map((lane) => {
                       const segments = laneSegmentsByKey.get(lane.key) || [];
                       const totalTracks =
                         segments.length > 0
@@ -883,6 +1533,135 @@ export function Calendario() {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )
+            ) : calendarView === "day" ? (
+              dayRoomRows.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No hay eventos para el día actual.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Eventos del día seleccionado: {format(selectedDay, "d 'de' MMMM yyyy", { locale: es })}
+                  </p>
+
+                  {daySchedulesLoading && !hasAnyActivityScheduleForDay && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Spinner size="sm" />
+                      Cargando horarios del día...
+                    </div>
+                  )}
+
+                  <div className="overflow-auto rounded-md border">
+                    <div
+                      className="min-w-max"
+                      style={{
+                        width:
+                          DAY_EVENT_COL_WIDTH + dayHours.length * DAY_HOUR_WIDTH,
+                      }}
+                    >
+                      <div
+                        className="sticky top-0 z-30 border-b bg-background"
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: `${DAY_EVENT_COL_WIDTH}px repeat(${dayHours.length}, ${DAY_HOUR_WIDTH}px)`,
+                        }}
+                      >
+                        <div className="sticky left-0 z-40 border-r bg-background px-3 py-2 text-sm font-medium">
+                          Salón
+                        </div>
+                        {dayHours.map((hour) => (
+                          <div
+                            key={`hour-${hour}`}
+                            className="border-r px-1 py-2 text-center text-[10px] font-medium"
+                          >
+                            {String(hour).padStart(2, "0")}:00
+                          </div>
+                        ))}
+                      </div>
+
+                      {dayRoomRows.map((row) => {
+                        const totalTracks =
+                          row.segments.length > 0
+                            ? Math.max(
+                                ...row.segments.map((segment) => segment.track)
+                              ) + 1
+                            : 1;
+                        const laneHeight = Math.max(52, totalTracks * 24 + 8);
+
+                        return (
+                          <div
+                            key={`day-row-${row.lane.key}`}
+                            className="border-b"
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: `${DAY_EVENT_COL_WIDTH}px 1fr`,
+                            }}
+                          >
+                            <div className="sticky left-0 z-20 border-r bg-background px-3 py-2 text-sm">
+                              <div className="font-medium truncate">{row.lane.label}</div>
+                            </div>
+
+                            <div
+                              className="relative"
+                              style={{
+                                height: laneHeight,
+                                width: dayHours.length * DAY_HOUR_WIDTH,
+                              }}
+                            >
+                              {dayHours.map((hour) => (
+                                <div
+                                  key={`day-grid-${row.lane.key}-${hour}`}
+                                  className="absolute top-0 h-full border-r"
+                                  style={{
+                                    left: hour * DAY_HOUR_WIDTH,
+                                    width: DAY_HOUR_WIDTH,
+                                  }}
+                                />
+                              ))}
+
+                              {row.segments.map((segment, index) => {
+                                const colorClass = getEventStatusColor(segment.event);
+                                const statusCategory = classifyEventStatus(segment.event);
+                                const textColorClass =
+                                  statusCategory === "confirmado"
+                                    ? "text-gray-900"
+                                    : "text-white";
+                                const left =
+                                  (segment.startMinutes / 60) * DAY_HOUR_WIDTH + 2;
+                                const width = Math.max(
+                                  20,
+                                  ((segment.endMinutes - segment.startMinutes) / 60) *
+                                    DAY_HOUR_WIDTH -
+                                    4
+                                );
+
+                                return (
+                                  <button
+                                    key={`day-segment-${row.lane.key}-${segment.event.idEvent}-${index}`}
+                                    type="button"
+                                    className={`${colorClass} ${textColorClass} absolute flex h-5 items-center rounded px-2 text-[10px] font-medium shadow-sm transition-transform hover:-translate-y-0.5`}
+                                    style={{
+                                      left,
+                                      top: 4 + segment.track * 22,
+                                      width,
+                                    }}
+                                    onClick={() => handleEventClick(segment.event)}
+                                    title={`${segment.event.title}\n${segment.label}\nEstado: ${segment.statusText}`}
+                                  >
+                                    <span className="truncate">
+                                      {segment.label} · {segment.event.title}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )
