@@ -92,7 +92,32 @@ interface DayRoomRow {
   segments: DayRoomSegment[];
 }
 
+interface CalendarReturnCache {
+  savedAt: number;
+  currentDate: string;
+  selectedDayValue: string;
+  selectedDate: string | null;
+  calendarView: CalendarView;
+  statusFilters: Record<StatusCategory, boolean>;
+  segmentFilters: Record<string, boolean>;
+  selectedRoomLaneKey: string;
+  events: Event[];
+  rooms: Room[];
+}
+
+interface HoverTooltipState {
+  event: Event;
+  timeLabel?: string;
+  left: number;
+  top: number;
+  placement: "top" | "bottom";
+}
+
+const CALENDAR_RETURN_CACHE_KEY = "calendar:return-cache";
+let inMemoryCalendarReturnCache: CalendarReturnCache | null = null;
+
 export function Calendario() {
+  const skipEventsFetchCountRef = useRef(0);
   const [currentDate, setCurrentDate] = useState(new Date());
   // monthPickerValue eliminado: usamos el DatePicker directamente para navegar
   const [events, setEvents] = useState<Event[]>([]);
@@ -117,6 +142,9 @@ export function Calendario() {
   const daySchedulesCacheRef = useRef<Record<number, Schedule[]>>({});
   const [baseSegments, setBaseSegments] = useState<SegmentOption[]>([]);
   const [segmentsLoading, setSegmentsLoading] = useState(true);
+  const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(
+    null
+  );
   const selectedDay = useMemo(() => {
     const parsed = parseDateLocal(selectedDayValue) || new Date(selectedDayValue);
     if (Number.isNaN(parsed.getTime())) return startOfDay(new Date());
@@ -130,6 +158,58 @@ export function Calendario() {
     () => Array.from({ length: 24 }, (_, index) => index),
     []
   );
+
+  useEffect(() => {
+    try {
+      const cached =
+        inMemoryCalendarReturnCache ??
+        (() => {
+          const raw = sessionStorage.getItem(CALENDAR_RETURN_CACHE_KEY);
+          if (!raw) return null;
+          return JSON.parse(raw) as CalendarReturnCache;
+        })();
+
+      if (!cached) return;
+
+      const cachedDate = parseDateLocal(cached.currentDate) || new Date(cached.currentDate);
+      const cachedDay =
+        parseDateLocal(cached.selectedDayValue) || new Date(cached.selectedDayValue);
+      const cachedSelectedDate = cached.selectedDate
+        ? parseDateLocal(cached.selectedDate) || new Date(cached.selectedDate)
+        : null;
+
+      if (Number.isNaN(cachedDate.getTime()) || Number.isNaN(cachedDay.getTime())) {
+        sessionStorage.removeItem(CALENDAR_RETURN_CACHE_KEY);
+        return;
+      }
+
+      skipEventsFetchCountRef.current = 2;
+      setCurrentDate(startOfDay(cachedDate));
+      setSelectedDayValue(format(cachedDay, "yyyy-MM-dd"));
+      setSelectedDate(
+        cachedSelectedDate && !Number.isNaN(cachedSelectedDate.getTime())
+          ? startOfDay(cachedSelectedDate)
+          : null
+      );
+      setCalendarView(cached.calendarView || "month");
+      setStatusFilters(
+        cached.statusFilters
+          ? { ...DEFAULT_STATUS_FILTERS, ...cached.statusFilters }
+          : { ...DEFAULT_STATUS_FILTERS }
+      );
+      setSegmentFilters(cached.segmentFilters || {});
+      setSelectedRoomLaneKey(cached.selectedRoomLaneKey || "");
+      setEvents(Array.isArray(cached.events) ? cached.events : []);
+      setRooms(Array.isArray(cached.rooms) ? cached.rooms : []);
+      setLoading(false);
+
+      inMemoryCalendarReturnCache = null;
+      sessionStorage.removeItem(CALENDAR_RETURN_CACHE_KEY);
+    } catch (error) {
+      inMemoryCalendarReturnCache = null;
+      sessionStorage.removeItem(CALENDAR_RETURN_CACHE_KEY);
+    }
+  }, []);
 
   // Helper: countdown for events in opcion1/2/3
   const getCountdownMsForEvent = (event: Event): number | null => {
@@ -169,6 +249,11 @@ export function Calendario() {
   };
 
   useEffect(() => {
+    if (skipEventsFetchCountRef.current > 0) {
+      skipEventsFetchCountRef.current -= 1;
+      return;
+    }
+
     loadEvents();
   }, [currentDate]);
 
@@ -1217,6 +1302,30 @@ export function Calendario() {
   };
 
   const handleEventClick = (event: Event) => {
+    const calendarCache: CalendarReturnCache = {
+      savedAt: Date.now(),
+      currentDate: format(currentDate, "yyyy-MM-dd"),
+      selectedDayValue,
+      selectedDate: selectedDate ? format(selectedDate, "yyyy-MM-dd") : null,
+      calendarView,
+      statusFilters,
+      segmentFilters,
+      selectedRoomLaneKey,
+      events,
+      rooms,
+    };
+
+    inMemoryCalendarReturnCache = calendarCache;
+
+    try {
+      sessionStorage.setItem(
+        CALENDAR_RETURN_CACHE_KEY,
+        JSON.stringify(calendarCache)
+      );
+    } catch {
+      // Ignorar límites de storage y confiar en cache en memoria para el retorno inmediato
+    }
+
     // Guardar el evento en sessionStorage para carga instantánea
     sessionStorage.setItem("currentEvent", JSON.stringify(event));
 
@@ -1240,6 +1349,136 @@ export function Calendario() {
   const selectedDateEvents: Event[] = selectedDate
     ? getEventsSpanningDate(selectedDate)
     : [];
+
+  const showEventTooltip = (
+    event: Event,
+    timeLabel: string | undefined,
+    target: HTMLElement,
+    placement: "top" | "bottom" = "top"
+  ) => {
+    const rect = target.getBoundingClientRect();
+    const horizontalPadding = 20;
+    const centerX = rect.left + rect.width / 2;
+    const clampedLeft = Math.max(
+      horizontalPadding,
+      Math.min(window.innerWidth - horizontalPadding, centerX)
+    );
+
+    setHoverTooltip({
+      event,
+      timeLabel,
+      left: clampedLeft,
+      top: placement === "bottom" ? rect.bottom + 8 : rect.top - 8,
+      placement,
+    });
+  };
+
+  const hideEventTooltip = () => setHoverTooltip(null);
+
+  const renderEventTooltipContent = (event: Event, timeLabel?: string) => {
+    const statusText = getEventStatusText(event) || "No especificado";
+    const rangeLabel = `${format(
+      parseDateLocal(event.startDate) || new Date(),
+      "d MMM yyyy",
+      { locale: es }
+    )} - ${format(parseDateLocal(event.endDate) || new Date(), "d MMM yyyy", {
+      locale: es,
+    })}`;
+
+    return (
+      <>
+        <p className="text-xs font-semibold text-foreground whitespace-normal break-words">
+          {event.title}
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground whitespace-normal break-words">
+          Horario: {timeLabel || "Sin horario definido"}
+        </p>
+        <p className="text-[11px] text-muted-foreground whitespace-normal break-words">
+          Estado: {statusText}
+        </p>
+        <p className="text-[11px] text-muted-foreground whitespace-normal break-words">
+          Fechas: {rangeLabel}
+        </p>
+      </>
+    );
+  };
+
+  const formatMinutesToTime = (minutes: number) => {
+    const safeMinutes = Math.max(0, Math.min(minutes, MINUTES_IN_DAY - 1));
+    const hours = Math.floor(safeMinutes / 60);
+    const mins = safeMinutes % 60;
+    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+  };
+
+  const getEventTooltipTimeLabel = (event: Event) => {
+    const ranges: Array<{ start: number; end: number }> = [];
+
+    const pushRange = (startRaw: unknown, endRaw: unknown) => {
+      const start = parseTimeToMinutes(
+        typeof startRaw === "string" ? startRaw : String(startRaw ?? "")
+      );
+      const end = parseTimeToMinutes(
+        typeof endRaw === "string" ? endRaw : String(endRaw ?? "")
+      );
+
+      if (start == null && end == null) return;
+
+      const normalizedStart = Math.max(
+        0,
+        Math.min(start ?? end ?? 0, MINUTES_IN_DAY - 1)
+      );
+      const normalizedEnd = Math.max(
+        normalizedStart + 15,
+        Math.min(end ?? start ?? MINUTES_IN_DAY, MINUTES_IN_DAY)
+      );
+
+      ranges.push({
+        start: normalizedStart,
+        end: normalizedEnd,
+      });
+    };
+
+    const activities = (event as any)?.activities;
+    if (Array.isArray(activities)) {
+      activities.forEach((activity: any) => {
+        pushRange(
+          activity?.startTime ?? activity?.eventActivityStartDate,
+          activity?.endTime ?? activity?.eventActivityEndDate
+        );
+
+        const nestedContainers = [
+          activity?.schedule,
+          activity?.schedules,
+          activity?.activitySchedule,
+          activity?.roomReservation,
+        ].flatMap((entry) => (Array.isArray(entry) ? entry : [entry]));
+
+        nestedContainers.forEach((container) => {
+          if (!container || typeof container !== "object") return;
+
+          pushRange(
+            (container as any)?.startTime ??
+              (container as any)?.eventActivityStartDate ??
+              (container as any)?.roomReservationFromDate,
+            (container as any)?.endTime ??
+              (container as any)?.eventActivityEndDate ??
+              (container as any)?.roomReservationToDate
+          );
+        });
+      });
+    }
+
+    if (ranges.length === 0) {
+      pushRange(event.startDate, event.endDate);
+    }
+
+    if (ranges.length === 0) return undefined;
+
+    const minStart = Math.min(...ranges.map((range) => range.start));
+    const maxEnd = Math.max(...ranges.map((range) => range.end));
+
+    return `${formatMinutesToTime(minStart)} - ${formatMinutesToTime(maxEnd)}`;
+  };
 
   return (
     <Layout>
@@ -1441,7 +1680,7 @@ export function Calendario() {
                       ))}
                     </div>
 
-                    {visibleRoomLanes.map((lane) => {
+                    {visibleRoomLanes.map((lane, laneIndex) => {
                       const segments = laneSegmentsByKey.get(lane.key) || [];
                       const totalTracks =
                         segments.length > 0
@@ -1504,24 +1743,22 @@ export function Calendario() {
                                 <button
                                   key={`${lane.key}-${segment.event.idEvent}-${segment.startIndex}-${segment.track}`}
                                   type="button"
-                                  className={`${colorClass} ${textColorClass} absolute flex h-5 items-center rounded px-2 text-[10px] font-medium shadow-sm transition-transform hover:-translate-y-0.5`}
+                                  className={`${colorClass} ${textColorClass} group absolute flex h-5 items-center rounded px-2 text-[10px] font-medium shadow-sm transition-transform hover:-translate-y-0.5`}
                                   style={{
                                     left,
                                     top: 4 + segment.track * 22,
                                     width,
                                   }}
                                   onClick={() => handleEventClick(segment.event)}
-                                  title={`${segment.event.title} (${format(
-                                    parseDateLocal(segment.event.startDate) ||
-                                      new Date(),
-                                    "d MMM",
-                                    { locale: es }
-                                  )} - ${format(
-                                    parseDateLocal(segment.event.endDate) ||
-                                      new Date(),
-                                    "d MMM",
-                                    { locale: es }
-                                  )})`}
+                                  onMouseEnter={(e) =>
+                                    showEventTooltip(
+                                      segment.event,
+                                      getEventTooltipTimeLabel(segment.event),
+                                      e.currentTarget as HTMLElement,
+                                      laneIndex < 2 ? "bottom" : "top"
+                                    )
+                                  }
+                                  onMouseLeave={hideEventTooltip}
                                 >
                                   <span className="truncate">
                                     {segment.event.title}
@@ -1582,7 +1819,7 @@ export function Calendario() {
                         ))}
                       </div>
 
-                      {dayRoomRows.map((row) => {
+                      {dayRoomRows.map((row, rowIndex) => {
                         const totalTracks =
                           row.segments.length > 0
                             ? Math.max(
@@ -1642,14 +1879,22 @@ export function Calendario() {
                                   <button
                                     key={`day-segment-${row.lane.key}-${segment.event.idEvent}-${index}`}
                                     type="button"
-                                    className={`${colorClass} ${textColorClass} absolute flex h-5 items-center rounded px-2 text-[10px] font-medium shadow-sm transition-transform hover:-translate-y-0.5`}
+                                    className={`${colorClass} ${textColorClass} group absolute flex h-5 items-center rounded px-2 text-[10px] font-medium shadow-sm transition-transform hover:-translate-y-0.5`}
                                     style={{
                                       left,
                                       top: 4 + segment.track * 22,
                                       width,
                                     }}
                                     onClick={() => handleEventClick(segment.event)}
-                                    title={`${segment.event.title}\n${segment.label}\nEstado: ${segment.statusText}`}
+                                    onMouseEnter={(e) =>
+                                      showEventTooltip(
+                                        segment.event,
+                                        segment.label,
+                                        e.currentTarget as HTMLElement,
+                                        rowIndex < 2 ? "bottom" : "top"
+                                      )
+                                    }
+                                    onMouseLeave={hideEventTooltip}
                                   >
                                     <span className="truncate">
                                       {segment.label} · {segment.event.title}
@@ -1679,14 +1924,14 @@ export function Calendario() {
                 </div>
 
                 {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-2 overflow-hidden">
+                <div className="grid grid-cols-7 gap-2 overflow-visible">
                   {/* Empty cells for padding */}
                   {Array.from({ length: monthStart.getDay() }).map((_, i) => (
                     <div key={`empty-${i}`} className="aspect-square" />
                   ))}
 
                   {/* Days */}
-                  {days.map((day) => {
+                  {days.map((day, dayIndex) => {
                     const spanningEvents = getEventsSpanningDate(day);
                     const isSelected =
                       selectedDate && isSameDay(day, selectedDate);
@@ -1820,7 +2065,7 @@ export function Calendario() {
                                           (event as any)?.eventNumber ??
                                           event.idEvent
                                         }-${day.toISOString()}`}
-                                        className={`${colorClass} ${textColorClass} text-[10px] px-1 py-0.5 rounded shadow-sm truncate pointer-events-auto cursor-pointer transition-transform duration-200 transform will-change-transform flex items-center gap-1 ${radiusClasses}`}
+                                        className={`${colorClass} ${textColorClass} group text-[10px] px-1 py-0.5 rounded shadow-sm truncate pointer-events-auto cursor-pointer transition-transform duration-200 transform will-change-transform flex items-center gap-1 ${radiusClasses}`}
                                         style={{
                                           position: "relative",
                                           width: widthValue,
@@ -1831,18 +2076,18 @@ export function Calendario() {
                                           e.stopPropagation();
                                           handleEventClick(event);
                                         }}
-                                        title={`${event.title} (${format(
-                                          parseDateLocal(event.startDate) ||
-                                            new Date(),
-                                          "d MMM"
-                                        )} - ${format(
-                                          parseDateLocal(event.endDate) ||
-                                            new Date(),
-                                          "d MMM"
-                                        )})`}
                                         onMouseEnter={(e) => {
                                           const el =
                                             e.currentTarget as HTMLElement;
+                                          showEventTooltip(
+                                            event,
+                                            getEventTooltipTimeLabel(event),
+                                            el,
+                                            Math.floor((monthStart.getDay() + dayIndex) / 7) ===
+                                              0
+                                              ? "bottom"
+                                              : "top"
+                                          );
                                           el.style.transform =
                                             "translateY(-6px) scale(1.03)";
                                           el.style.boxShadow =
@@ -1852,6 +2097,7 @@ export function Calendario() {
                                         onMouseLeave={(e) => {
                                           const el =
                                             e.currentTarget as HTMLElement;
+                                          hideEventTooltip();
                                           el.style.transform = "";
                                           el.style.boxShadow = "";
                                           el.style.zIndex = "";
@@ -1993,6 +2239,25 @@ export function Calendario() {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {hoverTooltip && (
+          <div
+            className="pointer-events-none fixed z-[9999] w-72 max-w-[calc(100vw-2rem)] rounded-md border bg-popover/95 p-2 shadow-2xl"
+            style={{
+              left: hoverTooltip.left,
+              top: hoverTooltip.top,
+              transform:
+                hoverTooltip.placement === "bottom"
+                  ? "translate(-50%, 0)"
+                  : "translate(-50%, -100%)",
+            }}
+          >
+            {renderEventTooltipContent(
+              hoverTooltip.event,
+              hoverTooltip.timeLabel
+            )}
+          </div>
         )}
       </div>
     </Layout>
