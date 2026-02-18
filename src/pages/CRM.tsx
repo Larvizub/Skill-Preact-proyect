@@ -46,6 +46,7 @@ import {
 import { apiService } from "../services/api.service";
 import { resolveEventQuoteGrandTotal } from "../lib/quoteUtils";
 import { SALES_STAGE_OPTIONS } from "./oportunidadesForm";
+import { toast } from "sonner";
 
 const STAGE_BADGE_CLASS: Record<OpportunityStage, string> = {
   prospecto: "bg-muted text-muted-foreground",
@@ -283,7 +284,7 @@ export function CRM() {
       setEventIdInput("");
     } catch (error) {
       console.error("Error enlazando oportunidad a Skill:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "No se pudo enlazar la oportunidad con el evento en Skill."
@@ -313,7 +314,7 @@ export function CRM() {
       );
     } catch (error) {
       console.error("Error cambiando etapa:", error);
-      alert("No se pudo actualizar la etapa.");
+      toast.error("No se pudo actualizar la etapa.");
     }
   };
 
@@ -327,7 +328,7 @@ export function CRM() {
       await crmService.deleteOpportunity(selectedDb, opportunity.id);
     } catch (error) {
       console.error("Error eliminando oportunidad:", error);
-      alert("No se pudo eliminar la oportunidad.");
+      toast.error("No se pudo eliminar la oportunidad.");
     }
   };
 
@@ -353,10 +354,10 @@ export function CRM() {
         clientCode: typeof clientCode === "string" ? clientCode : undefined,
       });
 
-      alert("Cliente creado/marcado en Skill correctamente.");
+      toast.success("Cliente creado/marcado en Skill correctamente.");
     } catch (error) {
       console.error("Error creando cliente en Skill:", error);
-      alert(
+      toast.error(
         "No se pudo crear automáticamente el cliente en Skill. Puedes intentarlo de nuevo o registrarlo manualmente desde Skill."
       );
     } finally {
@@ -376,7 +377,7 @@ export function CRM() {
       setNoteText("");
     } catch (error) {
       console.error("Error agregando nota:", error);
-      alert("No se pudo guardar la nota.");
+      toast.error("No se pudo guardar la nota.");
     }
   };
 

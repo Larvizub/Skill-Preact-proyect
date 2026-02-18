@@ -40,6 +40,7 @@ import {
 } from "lucide-preact";
 import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { toast } from "sonner";
 
 
 export function SalonesDisponibles() {
@@ -76,11 +77,11 @@ export function SalonesDisponibles() {
 
   const handleSearch = async () => {
     if (!startDate || !endDate) {
-      alert("Por favor selecciona un rango de fechas válido");
+      toast.error("Por favor selecciona un rango de fechas válido");
       return;
     }
     if (startDate > endDate) {
-      alert("La fecha de inicio debe ser anterior a la fecha de fin");
+      toast.error("La fecha de inicio debe ser anterior a la fecha de fin");
       return;
     }
 

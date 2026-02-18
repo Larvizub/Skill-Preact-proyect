@@ -6,6 +6,7 @@ import { Spinner } from "../components/ui/spinner";
 import { authService } from "../services/auth.service";
 import { crmService } from "../services/crm.service";
 import { apiService } from "../services/api.service";
+import { toast } from "sonner";
 import type { CrmDatabaseKey } from "../types/crm";
 import {
   buildOpportunityDetails,
@@ -152,11 +153,13 @@ export function CrearOportunidades() {
 
   const createOpportunity = async () => {
     if (!form.eventName.trim() || !form.accountName.trim()) {
-      alert("Nombre del evento y nombre de la cuenta son obligatorios.");
+      toast.error("Nombre del evento y nombre de la cuenta son obligatorios.");
       return;
     }
 
+    const toastId = "crm-create-opportunity";
     setSaving(true);
+    toast.loading("Guardando oportunidad...", { id: toastId });
     try {
       await crmService.createOpportunity(selectedDb, {
         title: form.eventName.trim(),
@@ -172,10 +175,12 @@ export function CrearOportunidades() {
         },
       });
 
+      toast.success("Oportunidad creada correctamente.", { id: toastId });
+
       route("/crm", true);
     } catch (error) {
       console.error("Error al crear oportunidad:", error);
-      alert("No fue posible crear la oportunidad.");
+      toast.error("No fue posible crear la oportunidad.", { id: toastId });
     } finally {
       setSaving(false);
     }

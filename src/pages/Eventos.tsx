@@ -47,6 +47,7 @@ import {
 } from "../lib/eventStatus";
 import { parseDateLocal } from "../lib/dateUtils";
 import { generateEventsExcelReport } from "../lib/reportUtils";
+import { toast } from "sonner";
 
 export function Eventos() {
   // Helper: devuelve ms restantes hasta creationDate + 1 mes, o null si no aplica
@@ -218,11 +219,11 @@ export function Eventos() {
   const loadEvents = async () => {
     // Validar que haya criterios de búsqueda
     if (filterType === "eventNumber" && !eventNumber.trim()) {
-      alert("Por favor ingresa un ID de evento");
+      toast.error("Por favor ingresa un ID de evento");
       return;
     }
     if (filterType === "dateRange" && (!startDate || !endDate)) {
-      alert("Por favor selecciona un rango de fechas");
+      toast.error("Por favor selecciona un rango de fechas");
       return;
     }
 
@@ -235,7 +236,7 @@ export function Eventos() {
         (end.getMonth() - start.getMonth());
 
       if (diffMonths > 6) {
-        alert(
+        toast.error(
           "Por favor selecciona un rango de fechas menor a 6 meses para optimizar la búsqueda"
         );
         return;
@@ -313,7 +314,7 @@ export function Eventos() {
       setEvents(normalized);
     } catch (error) {
       console.error("Error loading events:", error);
-      alert("Error al cargar eventos. Por favor intenta de nuevo.");
+      toast.error("Error al cargar eventos. Por favor intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -325,7 +326,7 @@ export function Eventos() {
 
   const handleExportExcel = async () => {
     if (filteredEvents.length === 0) {
-      alert(
+      toast.error(
         "No hay eventos visibles para exportar. Ajusta los filtros o realiza una búsqueda."
       );
       return;
@@ -336,7 +337,7 @@ export function Eventos() {
       await generateEventsExcelReport(filteredEvents);
     } catch (error) {
       console.error("Error al generar el reporte:", error);
-      alert("Hubo un error al generar el reporte de Excel.");
+      toast.error("Hubo un error al generar el reporte de Excel.");
     } finally {
       setGeneratingReport(false);
     }

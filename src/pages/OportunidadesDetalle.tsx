@@ -12,6 +12,7 @@ import { Spinner } from "../components/ui/spinner";
 import { authService } from "../services/auth.service";
 import { crmService } from "../services/crm.service";
 import { apiService } from "../services/api.service";
+import { toast } from "sonner";
 import type { CrmDatabaseKey, Opportunity } from "../types/crm";
 import {
   buildOpportunityDetails,
@@ -203,11 +204,13 @@ export function OportunidadesDetalle({ opportunityId, id }: OportunidadesDetalle
   const handleSave = async () => {
     if (!opportunity) return;
     if (!form.eventName.trim() || !form.accountName.trim()) {
-      alert("Nombre del evento y nombre de la cuenta son obligatorios.");
+      toast.error("Nombre del evento y nombre de la cuenta son obligatorios.");
       return;
     }
 
+    const toastId = "crm-update-opportunity";
     setSaving(true);
+    toast.loading("Guardando cambios de la oportunidad...", { id: toastId });
     try {
       await crmService.updateOpportunity(selectedDb, opportunity.id, {
         title: form.eventName.trim(),
@@ -223,9 +226,10 @@ export function OportunidadesDetalle({ opportunityId, id }: OportunidadesDetalle
         },
       });
       setEditing(false);
+      toast.success("Oportunidad actualizada correctamente.", { id: toastId });
     } catch (error) {
       console.error("Error actualizando oportunidad:", error);
-      alert("No fue posible actualizar la oportunidad.");
+      toast.error("No fue posible actualizar la oportunidad.", { id: toastId });
     } finally {
       setSaving(false);
     }
