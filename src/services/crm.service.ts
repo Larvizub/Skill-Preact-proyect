@@ -38,6 +38,41 @@ const toEntries = <T>(snapshot: DataSnapshot): T[] => {
 
 const nowIso = () => new Date().toISOString();
 
+const sanitizeForFirebase = (value: unknown): unknown => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeForFirebase(item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (typeof value === "object") {
+    const result: Record<string, unknown> = {};
+
+    Object.entries(value as Record<string, unknown>).forEach(([key, current]) => {
+      const sanitized = sanitizeForFirebase(current);
+      if (sanitized !== undefined) {
+        result[key] = sanitized;
+      }
+    });
+
+    return result;
+  }
+
+  return value;
+};
+
 const opportunitiesPath = "crm/opportunities";
 
 const timelinePathByOpportunity = (opportunityId: string) =>
@@ -109,12 +144,13 @@ const createTimelineEntry = async (
   const db = resolveDb(dbKey);
   const timelineRef = ref(db, timelinePathByOpportunity(opportunityId));
   const entryRef = push(timelineRef);
-
-  await set(entryRef, {
+  const payload = sanitizeForFirebase({
     ...entry,
     opportunityId,
     createdAt: nowIso(),
-  });
+  }) as Record<string, unknown>;
+
+  await set(entryRef, payload);
 };
 
 export const crmService = {
@@ -153,7 +189,7 @@ export const crmService = {
     }
 
     const timestamp = nowIso();
-    const opportunity: Omit<Opportunity, "id"> = {
+    const opportunity = sanitizeForFirebase({
       title: input.title,
       stage: input.stage,
       sourceDb: dbKey,
@@ -165,7 +201,7 @@ export const crmService = {
       client: input.client,
       createdAt: timestamp,
       updatedAt: timestamp,
-    };
+    }) as Omit<Opportunity, "id">;
 
     await set(itemRef, opportunity);
     await createTimelineEntry(dbKey, id, {
@@ -185,16 +221,16 @@ export const crmService = {
     const db = resolveDb(dbKey);
     const itemRef = ref(db, `${opportunitiesPath}/${opportunityId}`);
 
-    const payload: Record<string, unknown> = {
+    const payload = sanitizeForFirebase({
       ...input,
       updatedAt: nowIso(),
-    };
+    }) as Record<string, unknown>;
 
     await update(itemRef, payload);
     await createTimelineEntry(dbKey, opportunityId, {
       type: "updated",
       message: "Datos de la oportunidad actualizados.",
-      stage: input.stage,
+      ...(input.stage ? { stage: input.stage } : {}),
     });
   },
 
