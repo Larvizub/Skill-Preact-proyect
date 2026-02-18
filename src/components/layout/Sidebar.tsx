@@ -17,6 +17,7 @@ import {
   BriefcaseBusiness,
   Settings,
   ChevronRight,
+  Database,
 } from "lucide-preact";
 import { useMemo, useState } from "preact/hooks";
 import type { LucideIcon } from "lucide-preact";
@@ -89,6 +90,7 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
 
   const currentPath =
     typeof window !== "undefined" ? window.location.pathname : "";
+  const connectedDatabase = authService.getRecinto();
 
   const isPathActive = (path?: string) => {
     if (!path) return false;
@@ -181,6 +183,7 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
               </button>
             )}
           </div>
+
         </div>
 
         {/* Navigation */}
@@ -271,6 +274,11 @@ export function Sidebar({ className, isOpen = true, onClose }: SidebarProps) {
 
         {/* Theme Toggle + Logout */}
         <div className="p-4 border-t border-border">
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+            <Database className="h-4 w-4" />
+            <span className="font-semibold">Base de datos: {connectedDatabase}</span>
+          </div>
+
           <button
             onClick={toggleTheme}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
