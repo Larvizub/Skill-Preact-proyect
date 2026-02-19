@@ -50,7 +50,7 @@ export function Inventario() {
 
   const loadData = async () => {
     try {
-      const servicesData = await apiService.getServices();
+      const servicesData = await apiService.getServices({ includeRates: false });
       setServices(servicesData);
     } catch (error) {
       console.error("Error loading inventory:", error);

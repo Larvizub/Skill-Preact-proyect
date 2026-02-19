@@ -22,13 +22,94 @@ type CreateServicesCatalogServiceDeps = {
   getEvents: GetEvents;
 };
 
+type GetServicesOptions = {
+  includeRates?: boolean;
+  forceRefresh?: boolean;
+};
+
 export function createServicesCatalogService({
   apiRequest,
   buildPayload,
   withFallback,
   getEvents,
 }: CreateServicesCatalogServiceDeps) {
-  const getServices = () =>
+  const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
+  let servicesCatalogCache:
+    | {
+        data: Service[];
+        expiresAt: number;
+      }
+    | null = null;
+  let servicesCatalogInFlight: Promise<Service[]> | null = null;
+
+  const pickFirstNumber = (obj: any, keys: string[]) => {
+    for (const k of keys) {
+      if (obj == null) continue;
+      const v = obj[k];
+      if (v === 0) return 0;
+      if (typeof v === "number") return v;
+      if (typeof v === "string") {
+        const n = Number(v.replace(/[^0-9.-]+/g, ""));
+        if (!Number.isNaN(n)) return n;
+      }
+    }
+    return undefined;
+  };
+
+  const withTaxKeys = [
+    "priceTI",
+    "price_with_tax",
+    "priceWithTax",
+    "priceConIVA",
+    "priceConIva",
+    "priceConImp",
+    "servicePriceWithTax",
+    "price_with_vat",
+    "priceWithVat",
+    "priceTI0",
+    "price",
+  ];
+  const withoutTaxKeys = [
+    "priceTNI",
+    "price_without_tax",
+    "priceWithoutTax",
+    "priceSinIVA",
+    "priceSinIva",
+    "servicePriceWithoutTax",
+    "price_net",
+    "priceNet",
+    "unitPrice",
+  ];
+
+  const normalizeServicesPayload = (payload: unknown) => {
+    let raw: any[] = [];
+    if (Array.isArray(payload)) raw = payload as any[];
+    else if (Array.isArray((payload as any)?.services)) raw = (payload as any).services;
+    else if (Array.isArray((payload as any)?.result?.services))
+      raw = (payload as any).result.services;
+
+    return raw.map((service: any) => {
+      const priceTI = pickFirstNumber(service, withTaxKeys);
+      const priceTNI = pickFirstNumber(service, withoutTaxKeys);
+
+      let finalPriceTI = service.priceTI ?? priceTI;
+      let finalPriceTNI = service.priceTNI ?? priceTNI;
+      if (finalPriceTNI === undefined && finalPriceTI !== undefined) {
+        finalPriceTNI = undefined;
+      }
+      if (finalPriceTI === undefined && finalPriceTNI !== undefined) {
+        finalPriceTI = undefined;
+      }
+
+      return {
+        ...service,
+        priceTI: finalPriceTI,
+        priceTNI: finalPriceTNI,
+      } as Service;
+    });
+  };
+
+  const fetchNormalizedServices = () =>
     withFallback(
       () =>
         apiRequest<
@@ -56,76 +137,42 @@ export function createServicesCatalogService({
             },
           }),
         })
-    ).then(async (payload) => {
-      // Normalizar el payload a Service[] y mapear nombres alternativos de campos de precio
-      let raw: any[] = [];
-      if (Array.isArray(payload)) raw = payload as any[];
-      else if (Array.isArray((payload as any)?.services))
-        raw = (payload as any).services;
-      else if (Array.isArray((payload as any)?.result?.services))
-        raw = (payload as any).result.services;
+    ).then(normalizeServicesPayload);
 
-      const pickFirstNumber = (obj: any, keys: string[]) => {
-        for (const k of keys) {
-          if (obj == null) continue;
-          const v = obj[k];
-          if (v === 0) return 0;
-          if (typeof v === "number") return v;
-          if (typeof v === "string") {
-            const n = Number(v.replace(/[^0-9.-]+/g, ""));
-            if (!Number.isNaN(n)) return n;
-          }
-        }
-        return undefined;
-      };
+  const getServicesCatalogFast = async (forceRefresh = false) => {
+    const now = Date.now();
+    if (!forceRefresh && servicesCatalogCache && servicesCatalogCache.expiresAt > now) {
+      return servicesCatalogCache.data;
+    }
 
-      const withTaxKeys = [
-        "priceTI",
-        "price_with_tax",
-        "priceWithTax",
-        "priceConIVA",
-        "priceConIva",
-        "priceConImp",
-        "servicePriceWithTax",
-        "price_with_vat",
-        "priceWithVat",
-        "priceTI0",
-        "price",
-      ];
-      const withoutTaxKeys = [
-        "priceTNI",
-        "price_without_tax",
-        "priceWithoutTax",
-        "priceSinIVA",
-        "priceSinIva",
-        "servicePriceWithoutTax",
-        "price_net",
-        "priceNet",
-        "unitPrice",
-      ];
+    if (!forceRefresh && servicesCatalogInFlight) {
+      return servicesCatalogInFlight;
+    }
 
-      const normalized = raw.map((s: any) => {
-        const priceTI = pickFirstNumber(s, withTaxKeys);
-        const priceTNI = pickFirstNumber(s, withoutTaxKeys);
-
-        // Si la API solo provee un precio, intentar deducir:
-        // asumir `price` o `unitPrice` como sin impuesto si no hay campo explícito con impuesto
-        let finalPriceTI = s.priceTI ?? priceTI;
-        let finalPriceTNI = s.priceTNI ?? priceTNI;
-        if (finalPriceTNI === undefined && finalPriceTI !== undefined) {
-          // no se puede calcular el impuesto de forma fiable -> conservar solo un campo (TI)
-          finalPriceTNI = undefined;
-        }
-        if (finalPriceTI === undefined && finalPriceTNI !== undefined) {
-          finalPriceTI = undefined;
-        }
-
-        return {
-          ...s,
-          priceTI: finalPriceTI,
-          priceTNI: finalPriceTNI,
-        } as Service;
+    servicesCatalogInFlight = fetchNormalizedServices()
+      .then((normalized) => {
+        servicesCatalogCache = {
+          data: normalized,
+          expiresAt: Date.now() + CATALOG_CACHE_TTL_MS,
+        };
+        return normalized;
+      })
+      .finally(() => {
+        servicesCatalogInFlight = null;
       });
+
+    return servicesCatalogInFlight;
+  };
+
+  const getServices = async ({
+    includeRates = true,
+    forceRefresh = false,
+  }: GetServicesOptions = {}) => {
+    const normalized = await getServicesCatalogFast(forceRefresh);
+
+    if (!includeRates) {
+      return normalized;
+    }
 
       const parseRatesRaw = (ratesPayload: any) => {
         if (Array.isArray(ratesPayload)) return ratesPayload;
@@ -296,7 +343,7 @@ export function createServicesCatalogService({
         console.warn("getServices: no se pudo obtener GetServiceRates:", err);
         return normalized;
       }
-    });
+    };
 
   const getServiceRates = () =>
     withFallback(
@@ -314,6 +361,7 @@ export function createServicesCatalogService({
 
   return {
     getServices,
+    getServicesCatalogFast,
     getServiceRates,
   };
 }

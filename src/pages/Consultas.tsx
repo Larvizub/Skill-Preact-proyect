@@ -140,7 +140,7 @@ export function Consultas() {
   const loadServiceCatalog = async () => {
     setLoadingServices(true);
     try {
-      const services = await apiService.getServices();
+      const services = await apiService.getServices({ includeRates: false });
 
       const categoryMap = new Map<number, CategoryOption>();
       const subCategoryMap = new Map<number, SubCategoryOption>();
@@ -391,6 +391,7 @@ export function Consultas() {
           : null,
         categoryName: category?.name,
         subCategoryName: subCategory?.name,
+        serviceLookup,
       });
       showTopNotice("Reporte Excel generado correctamente.", "success");
     } catch (error: any) {

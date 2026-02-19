@@ -359,6 +359,15 @@ export async function generateConsultasExcelReport(
     subCategoryId?: number | null;
     categoryName?: string;
     subCategoryName?: string;
+    serviceLookup?: Map<
+      number,
+      {
+        categoryId: number;
+        categoryName: string;
+        subCategoryId: number;
+        subCategoryName: string;
+      }
+    >;
   }
 ) {
   const reportData: any[] = [];
@@ -371,7 +380,6 @@ export async function generateConsultasExcelReport(
     throw new Error("Selecciona una categoría válida para exportar.");
   }
 
-  const catalogServices = await apiService.getServices();
   const serviceLookup = new Map<
     number,
     {
@@ -382,17 +390,38 @@ export async function generateConsultasExcelReport(
     }
   >();
 
-  catalogServices.forEach((service: any) => {
-    serviceLookup.set(Number(service.idService), {
-      categoryId: Number(service?.serviceCategory?.idServiceCategory || 0),
-      categoryName: service?.serviceCategory?.serviceCategoryName || "Sin categoría",
-      subCategoryId: Number(
-        service?.serviceSubCategory?.idServiceSubCategory || 0
-      ),
-      subCategoryName:
-        service?.serviceSubCategory?.serviceSubCategoryName || "Sin subcategoría",
+  if (options.serviceLookup && options.serviceLookup.size > 0) {
+    options.serviceLookup.forEach((value, key) => {
+      serviceLookup.set(Number(key), {
+        categoryId: Number(value?.categoryId || 0),
+        categoryName: value?.categoryName || "Sin categoría",
+        subCategoryId: Number(value?.subCategoryId || 0),
+        subCategoryName: value?.subCategoryName || "Sin subcategoría",
+      });
     });
-  });
+  } else {
+    const catalogServices = await apiService.getServices({ includeRates: false });
+    catalogServices.forEach((service: any) => {
+      serviceLookup.set(Number(service.idService), {
+        categoryId: Number(service?.serviceCategory?.idServiceCategory || 0),
+        categoryName:
+          service?.serviceCategory?.serviceCategoryName || "Sin categoría",
+        subCategoryId: Number(
+          service?.serviceSubCategory?.idServiceSubCategory || 0
+        ),
+        subCategoryName:
+          service?.serviceSubCategory?.serviceSubCategoryName ||
+          "Sin subcategoría",
+      });
+    });
+  }
+
+  const hasUsableActivities = (event: any) =>
+    Array.isArray(event?.activities) &&
+    event.activities.some(
+      (activity: any) =>
+        Array.isArray(activity?.services) && activity.services.length > 0
+    );
 
   const activeEvents = events.filter((event) => !isItemCancelled(event));
   const BATCH_SIZE = 5;
@@ -405,7 +434,7 @@ export async function generateConsultasExcelReport(
         let quote = null;
         try {
           const id = event.idEvent || event.eventId || event.eventNumber;
-          if (id) {
+          if (id && !hasUsableActivities(event)) {
             quote = await apiService.getEventQuote(String(id));
           }
         } catch (error) {
