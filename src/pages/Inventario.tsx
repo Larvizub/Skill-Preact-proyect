@@ -33,6 +33,7 @@ import { Package, Tag, DollarSign, Eye, Check, X, Search } from "lucide-preact";
 export function Inventario() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPrices, setLoadingPrices] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -49,13 +50,26 @@ export function Inventario() {
   }, [searchTerm]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const servicesData = await apiService.getServices({ includeRates: false });
-      setServices(servicesData);
+      const servicesCatalog = await apiService.getServices({
+        includeRates: false,
+        forceRefresh: false,
+      });
+      setServices(servicesCatalog);
+      setLoading(false);
+
+      setLoadingPrices(true);
+      const servicesWithRates = await apiService.getServices({
+        includeRates: true,
+        forceRefresh: false,
+      });
+      setServices(servicesWithRates);
     } catch (error) {
       console.error("Error loading inventory:", error);
     } finally {
       setLoading(false);
+      setLoadingPrices(false);
     }
   };
 
@@ -157,6 +171,7 @@ export function Inventario() {
             <CardDescription>
               {filteredServices.length} servicios disponibles
               {searchTerm && ` (filtrados de ${services.length} totales)`}
+              {loadingPrices ? " • Actualizando precios..." : ""}
             </CardDescription>
             <div className="flex items-center gap-2 mt-4">
               <div className="relative flex-1 max-w-sm">
@@ -227,8 +242,26 @@ export function Inventario() {
                           </div>
                         </TableCell>
                         <TableCell>{service.serviceStock}</TableCell>
-                        <TableCell>{formatPrice(priceInfo.tni)}</TableCell>
-                        <TableCell>{formatPrice(priceInfo.ti)}</TableCell>
+                        <TableCell>
+                          {loadingPrices && priceInfo.tni == null ? (
+                            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                              <Spinner className="h-3 w-3" />
+                              Cargando...
+                            </span>
+                          ) : (
+                            formatPrice(priceInfo.tni)
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {loadingPrices && priceInfo.ti == null ? (
+                            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                              <Spinner className="h-3 w-3" />
+                              Cargando...
+                            </span>
+                          ) : (
+                            formatPrice(priceInfo.ti)
+                          )}
+                        </TableCell>
 
                         <TableCell>
                           {service.serviceActive ? (

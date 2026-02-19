@@ -15,11 +15,19 @@ type GetEvents = (
   eventName?: string
 ) => Promise<any[]>;
 
+type GetSchedules = (
+  startDate?: string,
+  endDate?: string,
+  eventNumber?: number,
+  idEventActivity?: number
+) => Promise<any[]>;
+
 type CreateServicesCatalogServiceDeps = {
   apiRequest: ApiRequest;
   buildPayload: BuildPayload;
   withFallback: WithFallback;
   getEvents: GetEvents;
+  getSchedules: GetSchedules;
 };
 
 type GetServicesOptions = {
@@ -32,7 +40,11 @@ export function createServicesCatalogService({
   buildPayload,
   withFallback,
   getEvents,
+  getSchedules,
 }: CreateServicesCatalogServiceDeps) {
+  const SERVICES_WITH_RATES_CACHE_TTL_MS = 2 * 60 * 1000;
+  let lastSuccessfulServiceRatesActivityId: number | null = null;
+
   const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
   let servicesCatalogCache:
     | {
@@ -41,6 +53,19 @@ export function createServicesCatalogService({
       }
     | null = null;
   let servicesCatalogInFlight: Promise<Service[]> | null = null;
+  let servicesWithRatesCache:
+    | {
+        data: Service[];
+        expiresAt: number;
+      }
+    | null = null;
+  let servicesWithRatesInFlight: Promise<Service[]> | null = null;
+  let serviceRatesActivityIdsCache:
+    | {
+        ids: number[];
+        expiresAt: number;
+      }
+    | null = null;
 
   const pickFirstNumber = (obj: any, keys: string[]) => {
     for (const k of keys) {
@@ -168,11 +193,25 @@ export function createServicesCatalogService({
     includeRates = true,
     forceRefresh = false,
   }: GetServicesOptions = {}) => {
+    const now = Date.now();
+
+    if (includeRates && !forceRefresh && servicesWithRatesCache) {
+      if (servicesWithRatesCache.expiresAt > now) {
+        return servicesWithRatesCache.data;
+      }
+    }
+
+    if (includeRates && !forceRefresh && servicesWithRatesInFlight) {
+      return servicesWithRatesInFlight;
+    }
+
     const normalized = await getServicesCatalogFast(forceRefresh);
 
     if (!includeRates) {
       return normalized;
     }
+
+    const resolveServicesWithRates = async () => {
 
       const parseRatesRaw = (ratesPayload: any) => {
         if (Array.isArray(ratesPayload)) return ratesPayload;
@@ -212,28 +251,64 @@ export function createServicesCatalogService({
       };
 
       const resolveCandidateEventActivityIds = async () => {
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        const startDate = `${currentYear}-01-01`;
-        const endDate = `${currentYear}-12-31`;
+        const cacheNow = Date.now();
+        if (serviceRatesActivityIdsCache && serviceRatesActivityIdsCache.expiresAt > cacheNow) {
+          return serviceRatesActivityIdsCache.ids;
+        }
+
+        const currentYear = new Date().getFullYear();
+        const ids = new Set<number>();
+
+        const yearRanges = [
+          { start: `${currentYear}-01-01`, end: `${currentYear}-12-31` },
+          { start: `${currentYear - 1}-01-01`, end: `${currentYear - 1}-12-31` },
+        ];
 
         try {
-          const events = await getEvents(startDate, endDate);
-          const ids = new Set<number>();
-          extractEventActivityIdsDeep(events, ids);
-          return Array.from(ids).slice(0, 12);
+          for (const range of yearRanges) {
+            const events = await getEvents(range.start, range.end);
+            extractEventActivityIdsDeep(events, ids);
+
+            const eventNumbers = Array.from(
+              new Set(
+                (events || [])
+                  .map((event: any) => Number(event?.eventNumber ?? event?.idEvent))
+                  .filter((value: number) => Number.isFinite(value) && value > 0)
+              )
+            ).slice(0, 40);
+
+            for (const eventNumber of eventNumbers) {
+              try {
+                const schedules = await getSchedules(
+                  undefined,
+                  undefined,
+                  eventNumber
+                );
+
+                extractEventActivityIdsDeep(schedules, ids);
+                if (ids.size >= 60) break;
+              } catch {
+                // noop
+              }
+            }
+
+            if (ids.size >= 60) break;
+          }
+
+          const resolved = Array.from(ids)
+            .sort((a, b) => b - a)
+            .slice(0, 60);
+
+          serviceRatesActivityIdsCache = {
+            ids: resolved,
+            expiresAt: cacheNow + SERVICES_WITH_RATES_CACHE_TTL_MS,
+          };
+
+          return resolved;
         } catch {
           return [] as number[];
         }
       };
-
-      const serviceIds = Array.from(
-        new Set(
-          normalized
-            .map((service) => Number((service as any).idService))
-            .filter((id) => Number.isFinite(id) && id > 0)
-        )
-      );
 
       const fetchServiceRatesByActivity = async (idEventActivity: number) => {
         const now = new Date();
@@ -249,13 +324,7 @@ export function createServicesCatalogService({
               serviceRates: {
                 idEventActivity,
                 priceDate,
-                ...(serviceIds.length > 0 ? { serviceList: serviceIds } : {}),
               },
-            }),
-            buildPayload({
-              idEventActivity,
-              priceDate,
-              ...(serviceIds.length > 0 ? { serviceList: serviceIds } : {}),
             }),
           ];
 
@@ -277,48 +346,84 @@ export function createServicesCatalogService({
         return [] as any[];
       };
 
+      const pickActivePriceList = (rateNode: any, todayStr: string) => {
+        const lists = Array.isArray(rateNode?.priceLists)
+          ? rateNode.priceLists
+          : rateNode?.priceList
+          ? [rateNode.priceList]
+          : [];
+
+        if (lists.length === 0) return null;
+
+        const activeInRange = lists.find(
+          (item: any) =>
+            item?.priceListActive === true &&
+            (!item?.priceListFromDate ||
+              !item?.priceListToDate ||
+              (item.priceListFromDate <= todayStr &&
+                item.priceListToDate >= todayStr))
+        );
+
+        if (activeInRange) return activeInRange;
+
+        const active = lists.find((item: any) => item?.priceListActive === true);
+        return active || lists[0] || null;
+      };
+
       // Además, intentar obtener tarifas actualizadas desde GetServiceRates
       try {
-        let ratesRaw = await fetchServiceRatesByActivity(0);
-
-        if (ratesRaw.length === 0) {
-          const candidateActivityIds = await resolveCandidateEventActivityIds();
-          for (const idEventActivity of candidateActivityIds) {
-            ratesRaw = await fetchServiceRatesByActivity(idEventActivity);
-            if (ratesRaw.length > 0) break;
-          }
-        }
-
         const rateMap = new Map<number, any>();
         const todayStr = new Date().toISOString().slice(0, 10);
-        for (const r of ratesRaw) {
-          const id = Number(r.idService ?? r.id ?? r.serviceId ?? NaN);
-          if (Number.isNaN(id)) continue;
 
-          let chosenPriceList: any | undefined;
-          const lists = Array.isArray(r.priceLists)
-            ? r.priceLists
-            : r.priceList
-            ? [r.priceList]
-            : [];
-          if (lists.length > 0) {
-            // preferir la lista activa que cubra la fecha actual
-            chosenPriceList = lists.find(
-              (p: any) =>
-                p.priceListActive === true &&
-                (!p.priceListFromDate ||
-                  !p.priceListToDate ||
-                  (p.priceListFromDate <= todayStr &&
-                    p.priceListToDate >= todayStr))
+        const upsertRates = (ratesRaw: any[]) => {
+          for (const rateNode of ratesRaw) {
+            const id = Number(
+              rateNode?.idService ?? rateNode?.id ?? rateNode?.serviceId ?? NaN
             );
-            if (!chosenPriceList) {
-              // en su defecto usar cualquier lista activa
-              chosenPriceList =
-                lists.find((p: any) => p.priceListActive === true) || lists[0];
+            if (!Number.isFinite(id) || id <= 0) continue;
+
+            const chosenPriceList = pickActivePriceList(rateNode, todayStr);
+            const hasValidPrice =
+              Number.isFinite(Number(chosenPriceList?.servicePriceTaxesIncluded)) ||
+              Number.isFinite(Number(chosenPriceList?.servicePriceTaxesNotIncluded));
+
+            const existing = rateMap.get(id);
+            if (!existing || (!existing.hasValidPrice && hasValidPrice)) {
+              rateMap.set(id, {
+                raw: rateNode,
+                priceList: chosenPriceList,
+                hasValidPrice,
+              });
             }
           }
+        };
 
-          rateMap.set(id, { raw: r, priceList: chosenPriceList });
+        const targetServiceIds = new Set<number>(
+          normalized
+            .map((service) => Number((service as any).idService))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        );
+
+        const candidateActivityIds = await resolveCandidateEventActivityIds();
+        const orderedActivities = [
+          ...(lastSuccessfulServiceRatesActivityId
+            ? [lastSuccessfulServiceRatesActivityId]
+            : []),
+          0,
+          ...candidateActivityIds,
+        ].filter((id, index, list) => Number.isFinite(id) && id >= 0 && list.indexOf(id) === index);
+
+        let attempts = 0;
+        for (const idEventActivity of orderedActivities) {
+          const ratesRaw = await fetchServiceRatesByActivity(idEventActivity);
+          if (ratesRaw.length === 0) continue;
+
+          attempts += 1;
+          upsertRates(ratesRaw);
+          lastSuccessfulServiceRatesActivityId = idEventActivity;
+
+          if (rateMap.size >= targetServiceIds.size) break;
+          if (attempts >= 8 && rateMap.size > 0) break;
         }
 
         const merged = normalized.map((s: any) => {
@@ -337,6 +442,12 @@ export function createServicesCatalogService({
           }
           return s;
         });
+
+        servicesWithRatesCache = {
+          data: merged,
+          expiresAt: Date.now() + SERVICES_WITH_RATES_CACHE_TTL_MS,
+        };
+
         return merged;
       } catch (err) {
         // Si falla obtener tarifas, retornamos la lista normalizada sin merge
@@ -344,6 +455,17 @@ export function createServicesCatalogService({
         return normalized;
       }
     };
+
+    if (forceRefresh) {
+      servicesWithRatesCache = null;
+    }
+
+    servicesWithRatesInFlight = resolveServicesWithRates().finally(() => {
+      servicesWithRatesInFlight = null;
+    });
+
+    return servicesWithRatesInFlight;
+  };
 
   const getServiceRates = () =>
     withFallback(
