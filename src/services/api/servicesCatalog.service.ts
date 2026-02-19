@@ -8,16 +8,25 @@ type WithFallback = <T>(
   fallback?: () => Promise<T>
 ) => Promise<T>;
 
+type GetEvents = (
+  startDate?: string,
+  endDate?: string,
+  eventNumber?: string,
+  eventName?: string
+) => Promise<any[]>;
+
 type CreateServicesCatalogServiceDeps = {
   apiRequest: ApiRequest;
   buildPayload: BuildPayload;
   withFallback: WithFallback;
+  getEvents: GetEvents;
 };
 
 export function createServicesCatalogService({
   apiRequest,
   buildPayload,
   withFallback,
+  getEvents,
 }: CreateServicesCatalogServiceDeps) {
   const getServices = () =>
     withFallback(
@@ -118,26 +127,120 @@ export function createServicesCatalogService({
         } as Service;
       });
 
+      const parseRatesRaw = (ratesPayload: any) => {
+        if (Array.isArray(ratesPayload)) return ratesPayload;
+        if (Array.isArray(ratesPayload?.serviceRates)) return ratesPayload.serviceRates;
+        if (Array.isArray(ratesPayload?.result?.serviceRates))
+          return ratesPayload.result.serviceRates;
+        return [] as any[];
+      };
+
+      const extractEventActivityIdsDeep = (
+        source: unknown,
+        output: Set<number>,
+        depth = 0
+      ) => {
+        if (!source || depth > 6) return;
+
+        if (Array.isArray(source)) {
+          source.forEach((item) =>
+            extractEventActivityIdsDeep(item, output, depth + 1)
+          );
+          return;
+        }
+
+        if (typeof source !== "object") return;
+
+        const node = source as Record<string, unknown>;
+        const maybeId = Number(
+          node.idEventActivity ?? node.eventActivityId ?? node.idActivity
+        );
+        if (Number.isFinite(maybeId) && maybeId > 0) output.add(maybeId);
+
+        Object.values(node).forEach((value) => {
+          if (value && (typeof value === "object" || Array.isArray(value))) {
+            extractEventActivityIdsDeep(value, output, depth + 1);
+          }
+        });
+      };
+
+      const resolveCandidateEventActivityIds = async () => {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const startDate = `${currentYear}-01-01`;
+        const endDate = `${currentYear}-12-31`;
+
+        try {
+          const events = await getEvents(startDate, endDate);
+          const ids = new Set<number>();
+          extractEventActivityIdsDeep(events, ids);
+          return Array.from(ids).slice(0, 12);
+        } catch {
+          return [] as number[];
+        }
+      };
+
+      const serviceIds = Array.from(
+        new Set(
+          normalized
+            .map((service) => Number((service as any).idService))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        )
+      );
+
+      const fetchServiceRatesByActivity = async (idEventActivity: number) => {
+        const now = new Date();
+        const dateCandidates = [
+          now.toISOString().slice(0, 10),
+          `${now.getFullYear()}-01-01`,
+          `${now.getFullYear()}-12-31`,
+        ];
+
+        for (const priceDate of dateCandidates) {
+          const payloads = [
+            buildPayload({
+              serviceRates: {
+                idEventActivity,
+                priceDate,
+                ...(serviceIds.length > 0 ? { serviceList: serviceIds } : {}),
+              },
+            }),
+            buildPayload({
+              idEventActivity,
+              priceDate,
+              ...(serviceIds.length > 0 ? { serviceList: serviceIds } : {}),
+            }),
+          ];
+
+          for (const body of payloads) {
+            try {
+              const ratesPayload = await apiRequest<any>("/events/getservicerates", {
+                method: "POST",
+                body,
+              });
+
+              const ratesRaw = parseRatesRaw(ratesPayload);
+              if (ratesRaw.length > 0) return ratesRaw;
+            } catch {
+              // noop
+            }
+          }
+        }
+
+        return [] as any[];
+      };
+
       // Además, intentar obtener tarifas actualizadas desde GetServiceRates
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const ratesPayload = await apiRequest<any>("/events/getservicerates", {
-          method: "POST",
-          body: buildPayload({
-            serviceRates: { idEventActivity: 0, priceDate: today },
-          }),
-        });
+        let ratesRaw = await fetchServiceRatesByActivity(0);
 
-        console.log("GetServiceRates response:", ratesPayload);
-
-        let ratesRaw: any[] = [];
-        if (Array.isArray(ratesPayload)) ratesRaw = ratesPayload;
-        else if (Array.isArray(ratesPayload?.serviceRates))
-          ratesRaw = ratesPayload.serviceRates;
-        else if (Array.isArray(ratesPayload?.result?.serviceRates))
-          ratesRaw = ratesPayload.result.serviceRates;
-
-        console.log("Rates raw array:", ratesRaw);
+        if (ratesRaw.length === 0) {
+          const candidateActivityIds = await resolveCandidateEventActivityIds();
+          for (const idEventActivity of candidateActivityIds) {
+            ratesRaw = await fetchServiceRatesByActivity(idEventActivity);
+            if (ratesRaw.length > 0) break;
+          }
+        }
 
         const rateMap = new Map<number, any>();
         const todayStr = new Date().toISOString().slice(0, 10);
@@ -168,12 +271,6 @@ export function createServicesCatalogService({
             }
           }
 
-          console.log(
-            `Service ${id}: priceLists =`,
-            lists,
-            "chosen =",
-            chosenPriceList
-          );
           rateMap.set(id, { raw: r, priceList: chosenPriceList });
         }
 
@@ -185,11 +282,6 @@ export function createServicesCatalogService({
             const inc = pl.servicePriceTaxesIncluded;
             const notInc = pl.servicePriceTaxesNotIncluded;
 
-            console.log(
-              `Service ${s.idService} (${s.serviceName}): TI=${inc}, TNI=${notInc}`,
-              pl
-            );
-
             return {
               ...s,
               priceTI: inc ?? s.priceTI,
@@ -198,8 +290,6 @@ export function createServicesCatalogService({
           }
           return s;
         });
-
-        console.log("Merged services with rates:", merged.slice(0, 3));
         return merged;
       } catch (err) {
         // Si falla obtener tarifas, retornamos la lista normalizada sin merge

@@ -57,6 +57,7 @@ const servicesCatalogService = createServicesCatalogService({
   apiRequest,
   buildPayload,
   withFallback,
+  getEvents: eventsService.getEvents,
 });
 const lookupsService = createLookupsService({ apiRequest, buildPayload, withFallback });
 const activitiesService = createActivitiesService({ apiRequest });

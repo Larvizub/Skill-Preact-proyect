@@ -76,6 +76,51 @@ export function Inventario() {
     return `$${num.toFixed(2)}`;
   };
 
+  const asNumber = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(/,/g, ""));
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  };
+
+  const getServicePriceInfo = (service: Service) => {
+    const now = new Date().toISOString().slice(0, 10);
+    const lists = Array.isArray((service as any)?.priceLists)
+      ? (service as any).priceLists
+      : [];
+
+    const activeInRange = lists.find(
+      (item: any) =>
+        item?.priceListActive === true &&
+        (!item?.priceListFromDate ||
+          !item?.priceListToDate ||
+          (item.priceListFromDate <= now && item.priceListToDate >= now))
+    );
+
+    const selectedList =
+      activeInRange ??
+      lists.find((item: any) => item?.priceListActive === true) ??
+      lists[0];
+
+    const tni =
+      asNumber((service as any)?.priceTNI) ??
+      asNumber((service as any)?.servicePriceTaxesNotIncluded) ??
+      asNumber((service as any)?.servicePriceWithoutTax) ??
+      asNumber(selectedList?.servicePriceTaxesNotIncluded) ??
+      null;
+
+    const ti =
+      asNumber((service as any)?.priceTI) ??
+      asNumber((service as any)?.servicePriceTaxesIncluded) ??
+      asNumber((service as any)?.servicePriceWithTax) ??
+      asNumber(selectedList?.servicePriceTaxesIncluded) ??
+      null;
+
+    return { tni, ti };
+  };
+
   const filteredServices = services.filter((service) =>
     service.serviceName.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -142,15 +187,18 @@ export function Inventario() {
                       <TableHead>Servicio</TableHead>
                       <TableHead>Categoría</TableHead>
                       <TableHead>Stock</TableHead>
-                      <TableHead>Precio con Impuesto</TableHead>
-                      <TableHead>Precio sin Impuesto</TableHead>
+                      <TableHead>Precio TNI</TableHead>
+                      <TableHead>Precio TI</TableHead>
 
                       <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedServices.map((service) => (
+                    {paginatedServices.map((service) => {
+                      const priceInfo = getServicePriceInfo(service);
+
+                      return (
                       <TableRow key={service.idService}>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -179,8 +227,8 @@ export function Inventario() {
                           </div>
                         </TableCell>
                         <TableCell>{service.serviceStock}</TableCell>
-                        <TableCell>{formatPrice(service.priceTI)}</TableCell>
-                        <TableCell>{formatPrice(service.priceTNI)}</TableCell>
+                        <TableCell>{formatPrice(priceInfo.tni)}</TableCell>
+                        <TableCell>{formatPrice(priceInfo.ti)}</TableCell>
 
                         <TableCell>
                           {service.serviceActive ? (
@@ -206,7 +254,7 @@ export function Inventario() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    );})}
                   </TableBody>
                 </Table>
               </div>
@@ -337,8 +385,8 @@ export function Inventario() {
                   </div>
 
                   {/* Información de Precios */}
-                  {(selectedService.priceTI != null ||
-                    selectedService.priceTNI != null) && (
+                  {(getServicePriceInfo(selectedService).ti != null ||
+                    getServicePriceInfo(selectedService).tni != null) && (
                     <div>
                       <p className="text-sm font-medium mb-3">
                         Información de Precios
@@ -351,16 +399,16 @@ export function Inventario() {
                           </span>
                         </div>
                         <div className="text-sm text-muted-foreground space-y-1">
-                          {selectedService.priceTNI != null && (
+                          {getServicePriceInfo(selectedService).tni != null && (
                             <p>
-                              Precio sin impuesto (TNI):{" "}
-                              {formatPrice(selectedService.priceTNI)}
+                              Precio TNI:{" "}
+                              {formatPrice(getServicePriceInfo(selectedService).tni)}
                             </p>
                           )}
-                          {selectedService.priceTI != null && (
+                          {getServicePriceInfo(selectedService).ti != null && (
                             <p>
-                              Precio con impuesto (TI):{" "}
-                              {formatPrice(selectedService.priceTI)}
+                              Precio TI:{" "}
+                              {formatPrice(getServicePriceInfo(selectedService).ti)}
                             </p>
                           )}
                         </div>
