@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { Layout } from "../components/layout/Layout";
 import {
   Card,
@@ -29,9 +29,9 @@ import { apiService } from "../services/api.service";
 import type { Room, RoomRate } from "../services/api.service";
 import { Building, Users, Eye, Check, X, FileSpreadsheet } from "lucide-preact";
 import {
+  buildRoomPriceLookup,
   generateRoomsGeneralExcelReport,
   generateRoomsTotalsExcelReport,
-  getRoomPriceInfo,
 } from "../lib/roomsReportUtils";
 import { authService } from "../services/auth.service";
 import { toast } from "sonner";
@@ -101,10 +101,22 @@ export function Salones() {
     }).format(value);
   };
 
-  const roomsWithResolvedPriceCount = rooms.filter((room) => {
-    const priceInfo = getRoomPriceInfo(room, roomRates);
-    return priceInfo.price !== null && Number.isFinite(priceInfo.price);
-  }).length;
+  const roomPriceLookup = useMemo(
+    () => buildRoomPriceLookup(rooms, roomRates),
+    [rooms, roomRates]
+  );
+
+  const roomsWithResolvedPriceCount = useMemo(
+    () =>
+      rooms.reduce((count, room) => {
+        const priceInfo = roomPriceLookup.get(Number(room.idRoom));
+        if (priceInfo && priceInfo.price !== null && Number.isFinite(priceInfo.price)) {
+          return count + 1;
+        }
+        return count;
+      }, 0),
+    [rooms, roomPriceLookup]
+  );
 
   const handleExportGeneral = async () => {
     if (rooms.length === 0 || exportingGeneral) return;
@@ -260,7 +272,10 @@ export function Salones() {
                   </TableHeader>
                   <TableBody>
                     {rooms.map((room) => {
-                      const roomPriceInfo = getRoomPriceInfo(room, roomRates);
+                      const roomPriceInfo = roomPriceLookup.get(Number(room.idRoom)) ?? {
+                        price: null,
+                        currency: "USD",
+                      };
 
                       return (
                         <TableRow key={room.idRoom}>

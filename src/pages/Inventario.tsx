@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { Layout } from "../components/layout/Layout";
 import {
   Card,
@@ -28,7 +28,22 @@ import {
 } from "../components/ui/dialog";
 import { apiService } from "../services/api.service";
 import type { Service } from "../services/api.service";
-import { Package, Tag, DollarSign, Eye, Check, X, Search } from "lucide-preact";
+import {
+  buildServicePriceLookup,
+  generateInventoryGeneralExcelReport,
+  generateInventoryTotalsExcelReport,
+} from "../lib/inventoryReportUtils";
+import {
+  Package,
+  Tag,
+  DollarSign,
+  Eye,
+  Check,
+  X,
+  Search,
+  FileSpreadsheet,
+} from "lucide-preact";
+import { toast } from "sonner";
 
 export function Inventario() {
   const [services, setServices] = useState<Service[]>([]);
@@ -38,6 +53,8 @@ export function Inventario() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [exportingGeneral, setExportingGeneral] = useState(false);
+  const [exportingTotals, setExportingTotals] = useState(false);
   const itemsPerPage = 50;
 
   useEffect(() => {
@@ -90,60 +107,78 @@ export function Inventario() {
     return `$${num.toFixed(2)}`;
   };
 
-  const asNumber = (value: unknown): number | null => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const parsed = Number(value.replace(/,/g, ""));
-      if (Number.isFinite(parsed)) return parsed;
-    }
-    return null;
-  };
+  const filteredServices = useMemo(
+    () =>
+      services.filter((service) =>
+        service.serviceName.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [services, searchTerm]
+  );
 
-  const getServicePriceInfo = (service: Service) => {
-    const now = new Date().toISOString().slice(0, 10);
-    const lists = Array.isArray((service as any)?.priceLists)
-      ? (service as any).priceLists
-      : [];
-
-    const activeInRange = lists.find(
-      (item: any) =>
-        item?.priceListActive === true &&
-        (!item?.priceListFromDate ||
-          !item?.priceListToDate ||
-          (item.priceListFromDate <= now && item.priceListToDate >= now))
-    );
-
-    const selectedList =
-      activeInRange ??
-      lists.find((item: any) => item?.priceListActive === true) ??
-      lists[0];
-
-    const tni =
-      asNumber((service as any)?.priceTNI) ??
-      asNumber((service as any)?.servicePriceTaxesNotIncluded) ??
-      asNumber((service as any)?.servicePriceWithoutTax) ??
-      asNumber(selectedList?.servicePriceTaxesNotIncluded) ??
-      null;
-
-    const ti =
-      asNumber((service as any)?.priceTI) ??
-      asNumber((service as any)?.servicePriceTaxesIncluded) ??
-      asNumber((service as any)?.servicePriceWithTax) ??
-      asNumber(selectedList?.servicePriceTaxesIncluded) ??
-      null;
-
-    return { tni, ti };
-  };
-
-  const filteredServices = services.filter((service) =>
-    service.serviceName.toLowerCase().includes(searchTerm.toLowerCase())
+  const servicePriceLookup = useMemo(
+    () => buildServicePriceLookup(services),
+    [services]
   );
 
   // Lógica de paginación
   const totalPages = Math.ceil(filteredServices.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedServices = filteredServices.slice(startIndex, endIndex);
+  const paginatedServices = useMemo(
+    () => filteredServices.slice(startIndex, endIndex),
+    [filteredServices, startIndex, endIndex]
+  );
+
+  const selectedServicePrice = selectedService
+    ? servicePriceLookup.get(Number(selectedService.idService)) ?? {
+        tni: null,
+        ti: null,
+      }
+    : { tni: null, ti: null };
+
+  const handleExportGeneral = async () => {
+    if (services.length === 0 || exportingGeneral) return;
+
+    const toastId = "inventario-reporte-general";
+    setExportingGeneral(true);
+    toast.loading("Generando reporte general de inventario...", { id: toastId });
+
+    try {
+      await generateInventoryGeneralExcelReport(services, servicePriceLookup);
+      toast.success("Reporte general de inventario generado correctamente.", {
+        id: toastId,
+      });
+    } catch (error) {
+      console.error("Error exporting inventory general report:", error);
+      toast.error("No se pudo generar el reporte general de inventario.", {
+        id: toastId,
+      });
+    } finally {
+      setExportingGeneral(false);
+    }
+  };
+
+  const handleExportTotals = async () => {
+    if (services.length === 0 || exportingTotals) return;
+
+    const toastId = "inventario-reporte-totales";
+    setExportingTotals(true);
+    toast.loading("Generando reporte total de inventario...", { id: toastId });
+
+    try {
+      await generateInventoryTotalsExcelReport(services, servicePriceLookup);
+      toast.success("Reporte total de inventario generado correctamente.", {
+        id: toastId,
+      });
+    } catch (error) {
+      console.error("Error exporting inventory totals report:", error);
+      toast.error("No se pudo generar el reporte total de inventario.", {
+        id: toastId,
+      });
+    } finally {
+      setExportingTotals(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -167,23 +202,53 @@ export function Inventario() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Lista de Servicios</CardTitle>
-            <CardDescription>
-              {filteredServices.length} servicios disponibles
-              {searchTerm && ` (filtrados de ${services.length} totales)`}
-              {loadingPrices ? " • Actualizando precios..." : ""}
-            </CardDescription>
-            <div className="flex items-center gap-2 mt-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre del servicio..."
-                  value={searchTerm}
-                  onInput={(e) =>
-                    setSearchTerm((e.target as HTMLInputElement).value)
-                  }
-                  className="pl-10"
-                />
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <CardTitle>Lista de Servicios</CardTitle>
+                <CardDescription>
+                  {filteredServices.length} servicios disponibles
+                  {searchTerm && ` (filtrados de ${services.length} totales)`}
+                  {loadingPrices ? " • Actualizando precios..." : ""}
+                </CardDescription>
+                <div className="flex items-center gap-2 mt-4">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nombre del servicio..."
+                      value={searchTerm}
+                      onInput={(e) =>
+                        setSearchTerm((e.target as HTMLInputElement).value)
+                      }
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  onClick={handleExportGeneral}
+                  disabled={services.length === 0 || exportingGeneral}
+                  className="bg-green-600 hover:bg-green-700 text-white border-none shadow-sm"
+                >
+                  {exportingGeneral ? (
+                    <Spinner className="h-4 w-4 mr-2" />
+                  ) : (
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  )}
+                  {exportingGeneral ? "Generando..." : "Reporte Excel General"}
+                </Button>
+                <Button
+                  onClick={handleExportTotals}
+                  disabled={services.length === 0 || exportingTotals}
+                  className="bg-green-600 hover:bg-green-700 text-white border-none shadow-sm"
+                >
+                  {exportingTotals ? (
+                    <Spinner className="h-4 w-4 mr-2" />
+                  ) : (
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  )}
+                  {exportingTotals ? "Generando..." : "Reporte Excel Totales"}
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -211,7 +276,11 @@ export function Inventario() {
                   </TableHeader>
                   <TableBody>
                     {paginatedServices.map((service) => {
-                      const priceInfo = getServicePriceInfo(service);
+                      const priceInfo =
+                        servicePriceLookup.get(Number(service.idService)) ?? {
+                          tni: null,
+                          ti: null,
+                        };
 
                       return (
                       <TableRow key={service.idService}>
@@ -418,8 +487,8 @@ export function Inventario() {
                   </div>
 
                   {/* Información de Precios */}
-                  {(getServicePriceInfo(selectedService).ti != null ||
-                    getServicePriceInfo(selectedService).tni != null) && (
+                  {(selectedServicePrice.ti != null ||
+                    selectedServicePrice.tni != null) && (
                     <div>
                       <p className="text-sm font-medium mb-3">
                         Información de Precios
@@ -432,16 +501,16 @@ export function Inventario() {
                           </span>
                         </div>
                         <div className="text-sm text-muted-foreground space-y-1">
-                          {getServicePriceInfo(selectedService).tni != null && (
+                          {selectedServicePrice.tni != null && (
                             <p>
                               Precio TNI:{" "}
-                              {formatPrice(getServicePriceInfo(selectedService).tni)}
+                              {formatPrice(selectedServicePrice.tni)}
                             </p>
                           )}
-                          {getServicePriceInfo(selectedService).ti != null && (
+                          {selectedServicePrice.ti != null && (
                             <p>
                               Precio TI:{" "}
-                              {formatPrice(getServicePriceInfo(selectedService).ti)}
+                              {formatPrice(selectedServicePrice.ti)}
                             </p>
                           )}
                         </div>

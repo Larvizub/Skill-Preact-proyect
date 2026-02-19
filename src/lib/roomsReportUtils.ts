@@ -9,7 +9,18 @@ type NormalizedRoomRate = {
   currency: string;
 };
 
+export type RoomPriceInfo = {
+  price: number | null;
+  currency: string;
+};
+
+type RoomRatesContext = {
+  normalizedRates: NormalizedRoomRate[];
+  ratesByRoomId: Map<number, NormalizedRoomRate[]>;
+};
+
 const DEFAULT_CURRENCY = "USD";
+const roomRatesContextCache = new WeakMap<RoomRate[], RoomRatesContext>();
 
 const asNumber = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -223,10 +234,31 @@ const normalizeRate = (rate: RoomRate): NormalizedRoomRate => {
 const normalizeRoomRates = (roomRates: RoomRate[]) =>
   roomRates.map(normalizeRate);
 
-const findBaseRate = (roomId: number, roomRates: NormalizedRoomRate[]) => {
-  const roomSpecificRates = roomRates.filter(
-    (rate) => rate.roomId !== null && rate.roomId === roomId
-  );
+const getRoomRatesContext = (roomRates: RoomRate[]): RoomRatesContext => {
+  const cached = roomRatesContextCache.get(roomRates);
+  if (cached) return cached;
+
+  const normalizedRates = normalizeRoomRates(roomRates);
+  const ratesByRoomId = new Map<number, NormalizedRoomRate[]>();
+
+  normalizedRates.forEach((rate) => {
+    if (rate.roomId === null) return;
+    const current = ratesByRoomId.get(rate.roomId) ?? [];
+    current.push(rate);
+    ratesByRoomId.set(rate.roomId, current);
+  });
+
+  const context: RoomRatesContext = {
+    normalizedRates,
+    ratesByRoomId,
+  };
+
+  roomRatesContextCache.set(roomRates, context);
+  return context;
+};
+
+const findBaseRate = (roomId: number, context: RoomRatesContext) => {
+  const roomSpecificRates = context.ratesByRoomId.get(roomId) ?? [];
 
   const baseRate = roomSpecificRates.find(
     (rate) => !rate.setupId && !rate.setupName
@@ -239,12 +271,10 @@ const findSetupRate = (
   roomId: number,
   setupId: number,
   setupName: string,
-  roomRates: NormalizedRoomRate[]
+  context: RoomRatesContext
 ) => {
   const normalizedSetupName = setupName.trim().toLowerCase();
-  const roomSpecificRates = roomRates.filter(
-    (rate) => rate.roomId !== null && rate.roomId === roomId
-  );
+  const roomSpecificRates = context.ratesByRoomId.get(roomId) ?? [];
 
   const byId = roomSpecificRates.find(
     (rate) => rate.setupId !== null && rate.setupId === setupId
@@ -263,13 +293,13 @@ const findSetupRate = (
     if (byName) return byName;
   }
 
-  const globalById = roomRates.find(
+  const globalById = context.normalizedRates.find(
     (rate) => rate.setupId !== null && rate.setupId === setupId
   );
   if (globalById) return globalById;
 
   if (normalizedSetupName) {
-    const globalByName = roomRates.find(
+    const globalByName = context.normalizedRates.find(
       (rate) =>
         rate.setupName &&
         (rate.setupName === normalizedSetupName ||
@@ -284,8 +314,8 @@ const findSetupRate = (
 };
 
 export const getRoomPriceInfo = (room: Room, roomRates: RoomRate[]) => {
-  const normalizedRates = normalizeRoomRates(roomRates);
-  const baseRate = findBaseRate(Number(room.idRoom), normalizedRates);
+  const context = getRoomRatesContext(roomRates);
+  const baseRate = findBaseRate(Number(room.idRoom), context);
 
   if (baseRate && Number.isFinite(baseRate.price) && baseRate.price > 0) {
     return {
@@ -300,7 +330,7 @@ export const getRoomPriceInfo = (room: Room, roomRates: RoomRate[]) => {
         Number(room.idRoom),
         Number(setup.idRoomSetup),
         setup.roomSetupName || "",
-        normalizedRates
+        context
       )
     )
     .filter((rate): rate is NormalizedRoomRate =>
@@ -331,9 +361,20 @@ export const getRoomPriceInfo = (room: Room, roomRates: RoomRate[]) => {
   }
 
   return {
-    price: null as number | null,
+    price: null,
     currency: DEFAULT_CURRENCY,
   };
+};
+
+export const buildRoomPriceLookup = (
+  rooms: Room[],
+  roomRates: RoomRate[]
+): Map<number, RoomPriceInfo> => {
+  const lookup = new Map<number, RoomPriceInfo>();
+  rooms.forEach((room) => {
+    lookup.set(Number(room.idRoom), getRoomPriceInfo(room, roomRates));
+  });
+  return lookup;
 };
 
 export async function generateRoomsGeneralExcelReport(
@@ -341,6 +382,7 @@ export async function generateRoomsGeneralExcelReport(
   roomRates: RoomRate[]
 ) {
   const reportDate = new Date().toISOString().split("T")[0];
+  const roomPriceLookup = buildRoomPriceLookup(rooms, roomRates);
 
   const rows = rooms.map((room) => {
     const capacity =
@@ -348,7 +390,9 @@ export async function generateRoomsGeneralExcelReport(
         ? Math.max(...room.roomSetups.map((setup) => setup.roomSetupPaxsCapacity))
         : null;
 
-    const priceInfo = getRoomPriceInfo(room, roomRates);
+    const priceInfo =
+      roomPriceLookup.get(Number(room.idRoom)) ??
+      ({ price: null, currency: DEFAULT_CURRENCY } as RoomPriceInfo);
 
     return {
       "ID Salón": room.idRoom,
@@ -374,11 +418,11 @@ export async function generateRoomsTotalsExcelReport(
   rooms: Room[],
   roomRates: RoomRate[]
 ) {
-  const normalizedRates = normalizeRoomRates(roomRates);
+  const context = getRoomRatesContext(roomRates);
   const reportDate = new Date().toISOString().split("T")[0];
 
   const summaryRows = rooms.flatMap((room) => {
-    const baseRate = findBaseRate(Number(room.idRoom), normalizedRates);
+    const baseRate = findBaseRate(Number(room.idRoom), context);
     const basePrice = baseRate?.price ?? 0;
 
     if (room.roomSetups.length === 0) {
@@ -401,7 +445,7 @@ export async function generateRoomsTotalsExcelReport(
         Number(room.idRoom),
         Number(setup.idRoomSetup),
         setup.roomSetupName || "",
-        normalizedRates
+        context
       );
 
       const setupPrice = rate?.price ?? 0;
@@ -426,7 +470,7 @@ export async function generateRoomsTotalsExcelReport(
         Number(room.idRoom),
         Number(setup.idRoomSetup),
         setup.roomSetupName || "",
-        normalizedRates
+        context
       );
 
       return {
